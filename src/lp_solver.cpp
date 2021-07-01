@@ -39,12 +39,13 @@ LPSolver::LPSolver(const std::string& text)
     }
   }
 
-  /* Put this into the vector */
+  /* Load into the objective function space of the matrix */
   coefficient_matrix = Eigen::MatrixXd(lines.size(), first_line_components.size() + 1);
   for(int i = 0; i < first_line_components.size(); ++i) {
-    coefficient_matrix(0, i) = std::stod(first_line_components[i]);
+    coefficient_matrix(0, i+1) = std::stod(first_line_components[i]);
   }
 
+  /* Populate the rest of the matrix */
   for(size_t row = 1; row < lines.size(); ++row) {
     vector<string> line_components;
     stringstream streamified_line(lines[row]);
@@ -56,8 +57,4 @@ LPSolver::LPSolver(const std::string& text)
       coefficient_matrix(row, col) = std::stod(line_components[col]);
     }
   }
-
-  std::cout << coefficient_matrix << std::endl;
-
-  /* Allocate accordingly */
 }

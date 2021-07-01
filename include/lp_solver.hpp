@@ -9,12 +9,14 @@ class LPSolver
  public:
   LPSolver(const std::string& text);
 
-  void Solve();
-
+  void solve();
 
   private:
   void parse(const char*);
-  void translate_to_dictionary_form();
+  void findInitialFeasibleDictionary();
+
+  bool isUnbounded() const;
+
 
   Eigen::VectorXd objective_vector;
   Eigen::MatrixXd coefficient_matrix;

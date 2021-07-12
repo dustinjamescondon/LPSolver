@@ -4,10 +4,10 @@
 using namespace std;
 
 int main(int argc, char *argv[]) {
-  LPSolver solver("1 2 3 4 5\n1 2 3 4 5 -6\n9 8 7 6 5 4");
+  LPSolver solver("1 0\n1 1 1");
 
   solver.solve();
-  solver.pivot(0u,5u);
+
 
   return 0;
 }

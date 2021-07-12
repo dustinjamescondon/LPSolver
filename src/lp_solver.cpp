@@ -98,7 +98,7 @@ LPSolver::LPSolver(const std::string& text)
     non_basis_indices(i) = i;
   }
 
-  std::cout << "Basis indices: " <<  basis_indices << std::endl << "non basic indices: " << non_basis_indices << std::endl;
+  std::cout << "Basis indices: " <<  basis_indices << std::endl << "non basic indices: " << non_basis_indices.transpose() << std::endl;
   /*--------------------------------------------------*/
   std::cout << "A_B:\n" << A_B() << std::endl;
   std::cout << "A_N:\n" << A_N() << std::endl;
@@ -169,11 +169,9 @@ VectorXd LPSolver::calcZ_N() {
 double LPSolver::objective_value() {
   // first solve A_B v = b
   auto v = A_B().fullPivLu().solve(b_vector);
-  std::cout << "In 'objective_value(); v is: \n";
-  std::cout << v << std::endl;
-  std::cout << "c_B is: \n" << c_vector(basis_indices) << std::endl;
-  return c_vector(basis_indices).dot(v); // TODO make sure this is right
+  return c_vector(basis_indices).dot(v);
 }
+
 void LPSolver::pivot(size_t entering, size_t leaving)
 {
   for(size_t i = 0; i < basis_indices.size(); ++i) {
@@ -216,6 +214,7 @@ double LPSolver::solve()
     // If every element of Z is non-negative,
     //   then this is the optimal dictionary
     if(z_N.minCoeff() >= 0.0) {
+      std::cout << "Hey we found the optimal one!\n" << objective_value() << std::endl;
       return objective_value();
     }
 
@@ -229,9 +228,14 @@ double LPSolver::solve()
     std::cout << "Leaving variable chosen: " << leaving_index << std::endl;
 
     // Part 4: update for next iteration
+    std::cout << "x before: " << x_vector.transpose() << std::endl;
     x_B -= t * deltaX(leaving_index);
     x_vector(entering_index) = t;
+    std::cout << "x after: " << x_vector.transpose() << std::endl;
     pivot(entering_index, leaving_index);
+    z_vector(basis_indices).fill(0.0);
+    z_vector(non_basis_indices) = calcZ_N();
+    std::cout << "z_vector is now: " << z_vector.transpose() << std::endl;
   }
 }
 
@@ -251,15 +255,16 @@ double LPSolver::calcHighestIncrease(unsigned entering_index, unsigned& leaving_
 
   double min = std::numeric_limits<double>::max();
   for(size_t i = 0; i < basis_indices.size(); ++i) {
+    auto basis_index = basis_indices[i];
     if(delta_x[i] > 0.0) {
-      auto result = x_vector[i] / delta_x[i];
+      auto result = x_vector[basis_index] / delta_x[i];
       if(result < min) {
         min = result;
-        leaving_index_out = basis_indices[i];
+        leaving_index_out = basis_index;
       }
     }
   }
-
+  std::cout << "In 'calcHighestIncrease()'; highest increase is: " << min << std::endl;
   return min; // min is actually the max amount we can increase the given "entering" variable
 }
 

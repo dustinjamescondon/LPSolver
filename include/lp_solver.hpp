@@ -14,22 +14,22 @@ public:
   void pivot(size_t entering, size_t leaving);
 
 private:
-  MatrixXd A_B();
-  MatrixXd A_N();
-  VectorXd calcX_B();
-  VectorXd calcZ_N();
-  VectorXd c_B();
-  VectorXd c_N();
+  MatrixXd A_B() const;
+  MatrixXd A_N() const;
+  VectorXd calcX_B() const;
+  VectorXd calcZ_N() const;
+  VectorXd c_B() const;
+  VectorXd c_N() const;
   VectorXd deltaX(size_t entering_index);
 
   double calcHighestIncrease(unsigned int entering_index, unsigned int& leaving_index_out);
   double objective_value();
 
-  size_t chooseEnteringVariable();
-
-  void parse(const char*);
+  size_t chooseEnteringVariable() const;
   void findInitialFeasibleDictionary();
 
+  bool isPrimalFeasible() const;
+  bool isDualFeasible() const;
   bool isUnbounded();
   bool isOptimal();
 

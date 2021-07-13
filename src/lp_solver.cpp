@@ -111,7 +111,7 @@ LPSolver::LPSolver(const std::string& text)
 
 // assume the basis indices are sorted?
 // TODO do we need this to be a direct reference of the block in A?
-MatrixXd LPSolver::A_B()
+MatrixXd LPSolver::A_B() const
 {
   MatrixXd m(num_basic_vars, num_basic_vars);
   for(size_t col = 0; col < num_basic_vars; ++col) {
@@ -120,7 +120,7 @@ MatrixXd LPSolver::A_B()
   return m;
 }
 
-MatrixXd LPSolver::A_N()
+MatrixXd LPSolver::A_N() const
 {
   MatrixXd m(num_basic_vars, num_non_basic_vars);
   for(size_t col = 0; col < num_non_basic_vars; ++col) {
@@ -130,20 +130,20 @@ MatrixXd LPSolver::A_N()
 }
 
 // When do we need to calculate this?
-VectorXd LPSolver::calcX_B()
+VectorXd LPSolver::calcX_B() const
 {
   return A_B().fullPivLu().solve(b_vector);
 }
 
-VectorXd LPSolver::c_B() {
+VectorXd LPSolver::c_B() const {
   return c_vector(basis_indices);
 }
 
-VectorXd LPSolver::c_N() {
+VectorXd LPSolver::c_N() const {
   return c_vector(non_basis_indices);
 }
 
-VectorXd LPSolver::calcZ_N() {
+VectorXd LPSolver::calcZ_N() const {
   // first solve (A_B)^T v = c_B
   VectorXd v = A_B().transpose().fullPivLu().solve(c_B());
 
@@ -179,17 +179,18 @@ double LPSolver::solve()
 {
   {
     auto x_B = x_vector(basis_indices);
+    x_B = calcX_B();
     auto x_N = x_vector(non_basis_indices);
     /*  initialize the x values */
-    x_B = calcX_B();
     x_N.fill(0.0);
     // any of the basic variables are negative, then we don't have a feasible dictionary
-    if(x_B.minCoeff() < 0.0) {
+    if(!isPrimalFeasible()) {
+      std::cout << "Initial LP is not primal feasible\n";
       return -1.0;
     }
   }
 
-  // if here, we have an initially feasible dictionary, so solve the LP
+  // If here, we have an initially feasible dictionary, so solve the LP
   while(true) {
     auto z_N = z_vector(non_basis_indices);
     auto z_B = z_vector(basis_indices);
@@ -263,8 +264,8 @@ void LPSolver::findInitialFeasibleDictionary()
 }
 
 // NOTE: uses Bland's Rule (lowest index)
-size_t LPSolver::chooseEnteringVariable()  {
-  auto z_n = z_vector(non_basis_indices);
+size_t LPSolver::chooseEnteringVariable() const {
+  VectorXd z_n = z_vector(non_basis_indices);
   for(size_t i = 0; i < non_basis_indices.size(); ++i) {
     if(z_n(i) < 0.0) {
       return non_basis_indices[i];
@@ -273,6 +274,16 @@ size_t LPSolver::chooseEnteringVariable()  {
   return 0; // shouldn't get here
 }
 
+bool LPSolver::isDualFeasible() const {
+  return false;
+}
+
+bool LPSolver::isPrimalFeasible() const {
+  VectorXd x_B = calcX_B();
+
+  // if all the X_B coefficients are non-negative, it's infeasible
+  return (x_B.minCoeff() >= 0.0);
+}
 
 /* Returns if the basis is unbounded or not
    NOTE assumes the current dictionary isn't optimal, so need to check that before calling this

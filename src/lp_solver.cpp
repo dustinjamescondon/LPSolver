@@ -82,8 +82,8 @@ LPSolver::LPSolver(const std::string& text)
 
   std::cout << "number of basic vars: " << num_basic_vars << std::endl;
   std::cout << "number of non-basic vars: " << num_non_basic_vars << std::endl;
-  std::cout << equational_matrix << std::endl;
   equational_matrix.block(0, num_non_basic_vars, num_basic_vars, num_basic_vars) = Eigen::MatrixXd::Identity(num_basic_vars, num_basic_vars);
+  std::cout << "this is the full equational matrix:\n" << equational_matrix << std::endl;
 
   /*--------------------------------------------------
    * Initialize the basis and non-basis lists
@@ -168,7 +168,7 @@ VectorXd LPSolver::calcZ_N() {
 
 double LPSolver::objective_value() {
   // first solve A_B v = b
-  auto v = A_B().fullPivLu().solve(b_vector);
+  VectorXd v = A_B().fullPivLu().solve(b_vector);
   return c_vector(basis_indices).dot(v);
 }
 
@@ -192,21 +192,25 @@ void LPSolver::pivot(size_t entering, size_t leaving)
 
 double LPSolver::solve()
 {
-  auto x_B = x_vector(basis_indices);
-  auto x_N = x_vector(non_basis_indices);
-  auto z_N = z_vector(non_basis_indices);
-  auto z_B = z_vector(basis_indices);
-
-  /*  initialize the x values */
-  x_B = calcX_B();
-  x_N.fill(0.0);
-  // any of the basic variables are negative, then we don't have a feasible dictionary
-  if(x_B.minCoeff() < 0.0) {
-    return -1.0;
+  {
+    auto x_B = x_vector(basis_indices);
+    auto x_N = x_vector(non_basis_indices);
+    /*  initialize the x values */
+    x_B = calcX_B();
+    x_N.fill(0.0);
+    // any of the basic variables are negative, then we don't have a feasible dictionary
+    if(x_B.minCoeff() < 0.0) {
+      return -1.0;
+    }
   }
 
   // if here, we have an initially feasible dictionary, so solve the LP
   while(true) {
+    auto z_N = z_vector(non_basis_indices);
+    auto z_B = z_vector(basis_indices);
+    auto x_B = x_vector(basis_indices);
+    auto x_N = x_vector(non_basis_indices);
+
     // Update the z vector
     z_B.fill(0.0);
     z_N = calcZ_N();
@@ -215,6 +219,8 @@ double LPSolver::solve()
     //   then this is the optimal dictionary
     if(z_N.minCoeff() >= 0.0) {
       std::cout << "Hey we found the optimal one!\n" << objective_value() << std::endl;
+      std::cout << "The x vector is: " << x_vector.transpose() << std::endl;
+      std::cout << "The c vector is: " << c_vector.transpose() << std::endl;
       return objective_value();
     }
 
@@ -228,22 +234,17 @@ double LPSolver::solve()
     std::cout << "Leaving variable chosen: " << leaving_index << std::endl;
 
     // Part 4: update for next iteration
-    std::cout << "x before: " << x_vector.transpose() << std::endl;
     x_B -= t * deltaX(leaving_index);
     x_vector(entering_index) = t;
-    std::cout << "x after: " << x_vector.transpose() << std::endl;
     pivot(entering_index, leaving_index);
     z_vector(basis_indices).fill(0.0);
     z_vector(non_basis_indices) = calcZ_N();
-    std::cout << "z_vector is now: " << z_vector.transpose() << std::endl;
   }
 }
 
+
 // j is the potential entering variable index
 VectorXd LPSolver::deltaX(size_t j)  {
-  std::cout << "In deltaX(" << j << ")\n";
-  std::cout << "A_B is:\n" << A_B() << std::endl;
-  std::cout << "A_N.col(" << j << ") is:\n" << equational_matrix.col(j) << "\n";
   return A_B().fullPivLu().solve(equational_matrix.col(j));
 }
 
@@ -255,7 +256,7 @@ double LPSolver::calcHighestIncrease(unsigned entering_index, unsigned& leaving_
 
   double min = std::numeric_limits<double>::max();
   for(size_t i = 0; i < basis_indices.size(); ++i) {
-    auto basis_index = basis_indices[i];
+    size_t basis_index = basis_indices[i];
     if(delta_x[i] > 0.0) {
       auto result = x_vector[basis_index] / delta_x[i];
       if(result < min) {

@@ -23,15 +23,17 @@ LPSolver::LPSolver(const std::string& text)
       lines.push_back(line);
     }
   }
-  /*--------------------------------------------------*/
-
-  /* Get rid of any empty lines */
+  /*-------------------------------------------------
+   * Get rid of any empty lines
+   *................................................*/
   for(vector<string>::iterator it = lines.begin(); it != lines.end(); ++it) {
     if(it->empty())
       lines.erase(it);
   }
 
-  /* Count the number of rows and columns */
+  /*--------------------------------------------------
+   * Count the number of rows and columns
+   *..................................................*/
   vector<string> first_line_components;
   {
     stringstream streamified_line(lines[0]);
@@ -44,27 +46,35 @@ LPSolver::LPSolver(const std::string& text)
   num_non_basic_vars = first_line_components.size();
   num_basic_vars = lines.size() - 1; // subtracting the objective function line
 
+
+  /*--------------------------------------------------
+   * Allocate the vectors and matrices accordingly
+   *..................................................*/
   equational_matrix.resize(num_basic_vars, num_basic_vars + num_non_basic_vars);
   c_vector.resize(num_non_basic_vars + num_basic_vars);
   x_vector.resize(num_non_basic_vars + num_basic_vars);
   z_vector.resize(num_non_basic_vars + num_basic_vars);
   b_vector.resize(num_basic_vars);
 
-  { // fill the objective coefficient vector
-    for(int i = 0; i < first_line_components.size(); ++i) {
-      c_vector(i) = std::stod(first_line_components[i]);
-    }
-
-    for(int i = 0; i < num_basic_vars; ++i) {
-      c_vector(i + num_non_basic_vars) = 0.0;
-    }
+  /*--------------------------------------------------
+   * Fill the objective coefficient vector
+   *..................................................*/
+  for(int i = 0; i < first_line_components.size(); ++i) {
+    c_vector(i) = std::stod(first_line_components[i]);
   }
 
-  /* Populate the equational matrix */
+  for(int i = 0; i < num_basic_vars; ++i) {
+    c_vector(i + num_non_basic_vars) = 0.0;
+  }
+
+  /*--------------------------------------------------
+   * Populate the equational matrix
+   *..................................................*/
   for(size_t row = 1; row < lines.size(); ++row) {
     vector<string> line_components;
     stringstream streamified_line(lines[row]);
     string component;
+
     while(getline(streamified_line, component, ' ')) {
       line_components.push_back(component);
     }
@@ -80,10 +90,8 @@ LPSolver::LPSolver(const std::string& text)
     }
   }
 
-  std::cout << "number of basic vars: " << num_basic_vars << std::endl;
-  std::cout << "number of non-basic vars: " << num_non_basic_vars << std::endl;
+  // initialize the basis block of the matrix with the identity matrix
   equational_matrix.block(0, num_non_basic_vars, num_basic_vars, num_basic_vars) = Eigen::MatrixXd::Identity(num_basic_vars, num_basic_vars);
-  std::cout << "this is the full equational matrix:\n" << equational_matrix << std::endl;
 
   /*--------------------------------------------------
    * Initialize the basis and non-basis lists
@@ -98,13 +106,7 @@ LPSolver::LPSolver(const std::string& text)
     non_basis_indices(i) = i;
   }
 
-  std::cout << "Basis indices: " <<  basis_indices << std::endl << "non basic indices: " << non_basis_indices.transpose() << std::endl;
   /*--------------------------------------------------*/
-  std::cout << "A_B:\n" << A_B() << std::endl;
-  std::cout << "A_N:\n" << A_N() << std::endl;
-
-  std::cout << "Basic objective coefficients:" << x_B() << std::endl;
-  std::cout << "Non-basic objective coefficients:" << x_N() << std::endl;
 }
 
 // assume the basis indices are sorted?
@@ -127,15 +129,6 @@ MatrixXd LPSolver::A_N()
   return m;
 }
 
-VectorXd LPSolver::x_N()
-{
-  return x_vector(non_basis_indices);
-}
-
-VectorXd LPSolver::x_B() {
-  return x_vector(basis_indices);
-}
-
 // When do we need to calculate this?
 VectorXd LPSolver::calcX_B()
 {
@@ -148,14 +141,6 @@ VectorXd LPSolver::c_B() {
 
 VectorXd LPSolver::c_N() {
   return c_vector(non_basis_indices);
-}
-
-VectorXd LPSolver::z_B() {
-  return z_vector(basis_indices);
-}
-
-VectorXd LPSolver::z_N() {
-  return z_vector(non_basis_indices);
 }
 
 VectorXd LPSolver::calcZ_N() {
@@ -218,9 +203,8 @@ double LPSolver::solve()
     // If every element of Z is non-negative,
     //   then this is the optimal dictionary
     if(z_N.minCoeff() >= 0.0) {
-      std::cout << "Hey we found the optimal one!\n" << objective_value() << std::endl;
-      std::cout << "The x vector is: " << x_vector.transpose() << std::endl;
-      std::cout << "The c vector is: " << c_vector.transpose() << std::endl;
+      std::cout << "Hey we found the optimal one: " << objective_value() << std::endl;
+
       return objective_value();
     }
 
@@ -280,7 +264,7 @@ void LPSolver::findInitialFeasibleDictionary()
 
 // NOTE: uses Bland's Rule (lowest index)
 size_t LPSolver::chooseEnteringVariable()  {
-  VectorXd z_n = z_N();
+  auto z_n = z_vector(non_basis_indices);
   for(size_t i = 0; i < non_basis_indices.size(); ++i) {
     if(z_n(i) < 0.0) {
       return non_basis_indices[i];

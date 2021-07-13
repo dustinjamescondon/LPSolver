@@ -16,10 +16,6 @@ public:
 private:
   MatrixXd A_B();
   MatrixXd A_N();
-  VectorXd x_B();
-  VectorXd x_N();
-  VectorXd z_B();
-  VectorXd z_N();
   VectorXd calcX_B();
   VectorXd calcZ_N();
   VectorXd c_B();

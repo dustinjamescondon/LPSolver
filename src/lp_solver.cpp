@@ -175,9 +175,9 @@ void LPSolver::pivot(size_t entering, size_t leaving)
   std::sort(non_basis_indices.begin(), non_basis_indices.end(), std::less<unsigned int>());
 }
 
-double LPSolver::solve()
+void LPSolver::solve()
 {
-  {
+  { // Initialize the x vector and check for initial feasibility
     auto x_B = x_vector(basis_indices);
     x_B = calcX_B();
     auto x_N = x_vector(non_basis_indices);
@@ -186,7 +186,18 @@ double LPSolver::solve()
     // any of the basic variables are negative, then we don't have a feasible dictionary
     if(!isPrimalFeasible()) {
       std::cout << "Initial LP is not primal feasible\n";
-      return -1.0;
+      if(isDualFeasible()) {
+        // then solve the dual LP
+        /*
+        if unbounded
+           then primal is infeasible
+        else
+           optimal solution is optimal solution for primal
+        */
+      } else {
+        // Create
+      }
+
     }
   }
 
@@ -204,9 +215,9 @@ double LPSolver::solve()
     // If every element of Z is non-negative,
     //   then this is the optimal dictionary
     if(z_N.minCoeff() >= 0.0) {
-      std::cout << "Hey we found the optimal one: " << objective_value() << std::endl;
-
-      return objective_value();
+      std::cout << "optimal\n" << objective_value() << std::endl;
+      std::cout << x_vector.segment(0, num_non_basic_vars).transpose();
+      return;
     }
 
     // Part 2: choose entering variable (Bland's Rule for now)

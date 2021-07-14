@@ -9,8 +9,9 @@ class LPSolver
 {
 public:
   LPSolver(const std::string& text);
+  LPSolver() {}
 
-  double solve();
+  void solve();
   void pivot(size_t entering, size_t leaving);
 
 private:
@@ -32,6 +33,9 @@ private:
   bool isDualFeasible() const;
   bool isUnbounded();
   bool isOptimal();
+
+  void primalSolve(Eigen::VectorXd const& obj_coeff_vector);
+  void dualSolve(Eigen::VectorXd const& obj_coeff_vector);
 
   size_t num_basic_vars;
   size_t num_non_basic_vars;

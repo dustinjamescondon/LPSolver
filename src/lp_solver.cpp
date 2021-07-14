@@ -328,10 +328,6 @@ bool LPSolver::isOptimal()  {
   return calcZ_N().minCoeff() >= 0.0;
 }
 
-void LPSolver::findInitialFeasibleDictionary()
-{
-  /* first check if the current dictionary is feasible */
-}
 
 // NOTE: uses Bland's Rule (lowest index)
 size_t LPSolver::chooseEnteringVariable() const {
@@ -358,7 +354,11 @@ size_t LPSolver::chooseLeavingVariable_Dual() const {
 
 
 bool LPSolver::isDualFeasible() const {
-  return false;
+  x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
+
+  if(x_vector(basis_indices).minCoeff() < 0.0) {
+    // optimal solution to the dual, so return as such
+  }
 }
 
 bool LPSolver::isPrimalFeasible() const {

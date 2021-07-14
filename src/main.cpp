@@ -4,10 +4,12 @@
 using namespace std;
 
 int main(int argc, char *argv[]) {
-  LPSolver solver("1 1\n1 0 1\n0 1 1");
-
-  solver.solve();
-
+  if(argc == 2) {
+    LPSolver solver(argv[1]);
+    solver.solve();
+  } else {
+    std::cout << "Need to provide LP input file using command line argument\n";
+  }
 
   return 0;
 }

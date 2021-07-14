@@ -8,15 +8,22 @@
 
 using namespace std;
 
-LPSolver::LPSolver(const std::string& text)
+LPSolver::LPSolver(const char* filename)
 {
+  std::ifstream t(filename, std::ifstream::in);
+  if (!t.is_open()) {
+    std::cout<< "Couldn't open " << filename << std::endl;
+    exit(1);
+  }
+  std::stringstream streamified_text;
+  streamified_text << t.rdbuf();
+
   vector<string> lines;
 
   /*--------------------------------------------------
    * Parse the lines
    ..................................................*/
   {
-    stringstream streamified_text(text);
     string line;
 
     while(getline(streamified_text, line, '\n')){
@@ -105,8 +112,9 @@ LPSolver::LPSolver(const std::string& text)
   for(int i = 0; i < num_non_basic_vars; ++i) {
     non_basis_indices(i) = i;
   }
-
   /*--------------------------------------------------*/
+
+  std::cout <<"Here's the LP matrix in equational form:\n" << equational_matrix << std::endl;
 }
 
 // assume the basis indices are sorted?
@@ -151,7 +159,7 @@ VectorXd LPSolver::calcZ_N() const {
   return A_N().transpose() * v - c_N();
 }
 
-double LPSolver::objective_value() {
+double LPSolver::primalObjectiveValue() const {
   // first solve A_B v = b
   VectorXd v = A_B().fullPivLu().solve(b_vector);
   return c_vector(basis_indices).dot(v);
@@ -175,16 +183,41 @@ void LPSolver::pivot(size_t entering, size_t leaving)
   std::sort(non_basis_indices.begin(), non_basis_indices.end(), std::less<unsigned int>());
 }
 
-// TODO this can't be void: need to return if what we found was optimal or unbounded or something
-void LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) {
-  x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
+double LPSolver::dualObjectiveValue() const {
+  return c_vector(basis_indices).dot(A_B().fullPivLu().solve(b_vector));
+}
 
-  if(x_vector(basis_indices).minCoeff() < 0.0) {
+// TODO this can't be void: need to return if what we found was optimal or unbounded or something
+LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) {
+  {
+    z_vector(basis_indices).fill(0.0);
+
+    double v = A_B().transpose().fullPivLu().solve(c_B());
+    z_vector(non_basis_indices) = (A_N().transpose() * v) - c_N();
+  }
+  if(z_vector(non_basis_indices).minCoeff() < 0.0) {
     // optimal solution to the dual, so return as such
+    LPResult r;
+    r.isUnbounded = false;
+    r.isInfeasible = true;
+    return r;
   }
 
-  size_t leaving_index = chooseLeavingVariable_Dual();
+  while(true) {
+    size_t leaving_index = chooseLeavingVariable_Dual();
+    x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
+    x_vector(non_basis_indices).fill(0.0);
 
+    if(x_vector(basis_indices).minCoeff() >= 0.0) {
+      return dualObjectiveValue();
+    }
+    // Part 2: choose leaving variable
+    size_t leaving_index = chooseLeavingVariable_Dual();
+
+    // Part 3: choose entering variable
+
+    // NOTE NOTE NOTE NOTE Continue here NOTE NOTE NOTE NOTE
+  }
 
 }
 
@@ -201,6 +234,7 @@ void LPSolver::solve()
       std::cout << "Initial LP is not primal feasible\n";
       if(isDualFeasible()) {
         // then solve the dual LP
+        dualSolve(c_vector);
         /*
         if unbounded
            then primal is infeasible
@@ -228,7 +262,7 @@ void LPSolver::solve()
     // If every element of Z is non-negative,
     //   then this is the optimal dictionary
     if(z_N.minCoeff() >= 0.0) {
-      std::cout << "optimal\n" << objective_value() << std::endl;
+      std::cout << "optimal\n" << primalObjectiveValue() << std::endl;
       std::cout << x_vector.segment(0, num_non_basic_vars).transpose();
       return;
     }
@@ -353,12 +387,12 @@ size_t LPSolver::chooseLeavingVariable_Dual() const {
 
 
 
-bool LPSolver::isDualFeasible() const {
-  x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
+bool LPSolver::isDualFeasible() {
+  z_vector(basis_indices).fill(0.0);
+  VectorXd v = A_B().transpose().fullPivLu().solve(c_B());
+  z_vector(non_basis_indices) = (A_N().transpose() * v) - c_N();
 
-  if(x_vector(basis_indices).minCoeff() < 0.0) {
-    // optimal solution to the dual, so return as such
-  }
+  return (z_vector(non_basis_indices).minCoeff() >= 0.0);
 }
 
 bool LPSolver::isPrimalFeasible() const {

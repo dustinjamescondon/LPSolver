@@ -8,7 +8,7 @@ using namespace Eigen;
 class LPSolver
 {
 public:
-  LPSolver(const std::string& text);
+  LPSolver(const char* filename);
   LPSolver() {}
 
   void solve();
@@ -21,6 +21,12 @@ private:
     double maxIncrease;
   };
 
+  struct LPResult {
+    double optimal_val;
+    bool isUnbounded;
+    bool isInfeasible;
+  };
+
   MatrixXd A_B() const;
   MatrixXd A_N() const;
   VectorXd calcX_B() const;
@@ -29,21 +35,23 @@ private:
   VectorXd c_N() const;
   VectorXd deltaX(size_t entering_index);
 
+  double primalObjectiveValue() const;
+  double dualObjectiveValue() const;
+
   HighestIncreaseResult calcHighestIncrease(unsigned int entering_index);
   HighestIncreaseResult calcHighestIncrease_Dual(unsigned int leaving_index);
-  double objective_value();
 
   size_t chooseEnteringVariable() const;
   size_t chooseLeavingVariable_Dual() const;
   void findInitialFeasibleDictionary();
 
   bool isPrimalFeasible() const;
-  bool isDualFeasible() const;
+  bool isDualFeasible();
   bool isUnbounded();
   bool isOptimal();
 
   void primalSolve(Eigen::VectorXd const& obj_coeff_vector);
-  void dualSolve(Eigen::VectorXd const& obj_coeff_vector);
+  LPResult dualSolve(Eigen::VectorXd const& obj_coeff_vector);
 
   size_t num_basic_vars;
   size_t num_non_basic_vars;

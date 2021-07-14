@@ -175,6 +175,19 @@ void LPSolver::pivot(size_t entering, size_t leaving)
   std::sort(non_basis_indices.begin(), non_basis_indices.end(), std::less<unsigned int>());
 }
 
+// TODO this can't be void: need to return if what we found was optimal or unbounded or something
+void LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) {
+  x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
+
+  if(x_vector(basis_indices).minCoeff() < 0.0) {
+    // optimal solution to the dual, so return as such
+  }
+
+  size_t leaving_index = chooseLeavingVariable_Dual();
+
+
+}
+
 void LPSolver::solve()
 {
   { // Initialize the x vector and check for initial feasibility
@@ -225,8 +238,13 @@ void LPSolver::solve()
     std::cout << "Entering variable chosen: " << entering_index << std::endl;
 
     // Part 3: choose leaving variable
-    unsigned int leaving_index;
-    double t = calcHighestIncrease(entering_index, leaving_index);
+    auto highestIncreaseResult = calcHighestIncrease(entering_index);
+    size_t leaving_index = highestIncreaseResult.index;
+    double t = highestIncreaseResult.maxIncrease;
+    if(highestIncreaseResult.unbounded) {
+      std::cout << "unbounded";
+    }
+
     std::cout << "Leaving variable chosen: " << leaving_index << std::endl;
 
     // Part 4: update for next iteration
@@ -247,22 +265,63 @@ VectorXd LPSolver::deltaX(size_t j)  {
 // NOTE Assumes all possible entering vars have been checked for unboundedness, so don't bother
 // checking here
 // TODO rework how the leaving var is returned
-double LPSolver::calcHighestIncrease(unsigned entering_index, unsigned& leaving_index_out)  {
+LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_index)  {
+  HighestIncreaseResult result;
   VectorXd delta_x = deltaX(entering_index);
 
-  double min = std::numeric_limits<double>::max();
+  result.unbounded = true; // if we don't find a valid delta_x index, then it's unbounded
+  result.maxIncrease = std::numeric_limits<double>::max();
   for(size_t i = 0; i < basis_indices.size(); ++i) {
     size_t basis_index = basis_indices[i];
     if(delta_x[i] > 0.0) {
-      auto result = x_vector[basis_index] / delta_x[i];
-      if(result < min) {
-        min = result;
-        leaving_index_out = basis_index;
+      double fraction = x_vector[basis_index] / delta_x[i];
+
+      if(fraction < result.maxIncrease) {
+        result.maxIncrease = fraction;
+        result.index = basis_index;
+        result.unbounded = false;
       }
     }
   }
-  std::cout << "In 'calcHighestIncrease()'; highest increase is: " << min << std::endl;
-  return min; // min is actually the max amount we can increase the given "entering" variable
+
+  if(!result.unbounded)  {
+    std::cout << "In 'calcHighestIncrease()'; highest increase is: " << result.maxIncrease << std::endl;
+  } else {
+    std::cout << "In 'calcHighestIncrease()'; unbounded\n";
+  }
+
+  return result;
+}
+
+LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(unsigned leaving_index) {
+  HighestIncreaseResult result;
+
+  VectorXd u_vector(basis_indices.size());
+  for(size_t k = 0; k < u_vector.size(); ++k) {
+    u_vector(k) = (basis_indices(k) == leaving_index ? 1.0 : 0.0);
+  }
+
+  VectorXd delta_z(num_basic_vars + num_non_basic_vars);
+  delta_z.fill(0.0);
+  VectorXd v = A_B().transpose().fullPivLu().solve(u_vector);
+
+  delta_z(non_basis_indices) = -A_N().transpose() * v;
+
+  result.maxIncrease = std::numeric_limits<double>::max();
+  result.unbounded = true;
+  for(size_t i = 0; i < non_basis_indices.size(); ++i) {
+    size_t non_basis_index = non_basis_indices(i);
+    if(delta_z(non_basis_index) > 0.0) {
+      result.unbounded = false;
+      double fraction = z_vector(non_basis_index) / delta_z(non_basis_index);
+      if(fraction < result.maxIncrease) {
+         result.maxIncrease = fraction;
+         result.index = non_basis_index;
+      }
+    }
+  }
+
+  return result;
 }
 
 bool LPSolver::isOptimal()  {
@@ -284,6 +343,19 @@ size_t LPSolver::chooseEnteringVariable() const {
   }
   return 0; // shouldn't get here
 }
+
+// assumes it's not dual optimal, so there will be a leaving var
+size_t LPSolver::chooseLeavingVariable_Dual() const {
+  VectorXd x_B = x_vector(basis_indices);
+  for(size_t i = 0; i < basis_indices.size(); ++i) {
+    if(x_B(i) < 0.0) {
+      return basis_indices(i);
+    }
+  }
+  return 0;
+}
+
+
 
 bool LPSolver::isDualFeasible() const {
   return false;

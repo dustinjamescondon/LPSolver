@@ -15,6 +15,12 @@ public:
   void pivot(size_t entering, size_t leaving);
 
 private:
+  struct HighestIncreaseResult {
+    bool unbounded;
+    size_t index;
+    double maxIncrease;
+  };
+
   MatrixXd A_B() const;
   MatrixXd A_N() const;
   VectorXd calcX_B() const;
@@ -23,10 +29,12 @@ private:
   VectorXd c_N() const;
   VectorXd deltaX(size_t entering_index);
 
-  double calcHighestIncrease(unsigned int entering_index, unsigned int& leaving_index_out);
+  HighestIncreaseResult calcHighestIncrease(unsigned int entering_index);
+  HighestIncreaseResult calcHighestIncrease_Dual(unsigned int leaving_index);
   double objective_value();
 
   size_t chooseEnteringVariable() const;
+  size_t chooseLeavingVariable_Dual() const;
   void findInitialFeasibleDictionary();
 
   bool isPrimalFeasible() const;
@@ -47,4 +55,5 @@ private:
   Eigen::VectorXd z_vector;
   Eigen::VectorXd b_vector;
   Eigen::VectorXd x_vector;
+
 };

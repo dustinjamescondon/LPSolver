@@ -114,7 +114,9 @@ LPSolver::LPSolver(const char* filename)
   }
   /*--------------------------------------------------*/
 
+  #ifdef DEBUG
   std::cout <<"Here's the LP matrix in equational form:\n" << equational_matrix << std::endl;
+  #endif
 }
 
 // assume the basis indices are sorted?
@@ -227,7 +229,6 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     double s = highestIncreaseResult.maxIncrease;
 
     if(highestIncreaseResult.unbounded) {
-      std::cout << "unbounded";
       LPResult r;
       r.state = State::Unbounded;
 
@@ -243,6 +244,58 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
   }
 }
 
+LPSolver::LPResult LPSolver::primalSolve() {
+// Initialize the x vector and check for initial feasibility
+  auto x_B = x_vector(basis_indices);
+  auto x_N = x_vector(non_basis_indices);
+  x_B = calcX_B();
+  x_N.fill(0.0);
+
+  if(!isPrimalFeasible()) {
+    LPResult r;
+    r.state = State::Infeasible;
+    return r;
+  }
+
+  // If here, we have an initially feasible dictionary, so solve the LP
+  while(true) {
+    auto z_N = z_vector(non_basis_indices);
+    auto z_B = z_vector(basis_indices);
+    auto x_B = x_vector(basis_indices);
+    auto x_N = x_vector(non_basis_indices);
+
+    // Update the z vector
+    z_B.fill(0.0);
+    z_N = calcZ_N();
+
+    // If every element of Z is non-negative,
+    //   then this is the optimal dictionary
+    if(z_N.minCoeff() >= 0.0) {
+      LPResult r;
+      r.optimal_val = primalObjectiveValue();
+      r.state = State::Optimal;
+      return r;
+    }
+
+    // Part 2: choose entering variable (Bland's Rule for now)
+    auto entering_index = chooseEnteringVariable();
+
+    // Part 3: choose leaving variable
+    auto highestIncreaseResult = calcHighestIncrease(entering_index);
+    size_t leaving_index = highestIncreaseResult.index;
+    double t = highestIncreaseResult.maxIncrease;
+    if(highestIncreaseResult.unbounded) {
+      LPResult r;
+      r.state = State::Unbounded;
+      return r;
+    }
+
+    // Part 4: update for next iteration
+    x_B -= t * deltaX(leaving_index);
+    x_vector(entering_index) = t;
+    pivot(entering_index, leaving_index);
+  }
+}
 
 
 void LPSolver::solve()
@@ -255,9 +308,13 @@ void LPSolver::solve()
   x_N.fill(0.0);
   // any of the basic variables are negative, then we don't have a feasible dictionary
   if(!isPrimalFeasible()) {
+    #ifdef DEBUG
     std::cout << "Initial LP is not primal feasible\n";
+    #endif
     if(isDualFeasible()) {
+      #ifdef DEBUG
       std::cout << "But it is dual feasible!\n";
+      #endif
       // then solve the dual LP
       auto result = dualSolve(c_vector);
       if(result.state == State::Unbounded) {
@@ -267,21 +324,25 @@ void LPSolver::solve()
       else {
         std::cout << "optimal\n"
                   << result.optimal_val << std::endl
-                  << "Hmm how to translate dual answer...";
+                  << x_vector.segment(0, num_non_basic_vars).transpose();
       }
     }
     // Otherwise, if it isn't dual-feasible
     else {
+      #ifdef DEBUG
       std::cout << "And it isn't intially dual-feasible either...\n";
+      #endif
       // Then find a feasible basis
       Eigen::VectorXd zero_vector(c_vector.size());
       zero_vector.fill(0.0);
       auto auxResult = dualSolve(zero_vector);
 
       if(auxResult.state == State::Optimal) {
+        #ifdef DEBUG
         std::cout << "Found the optimal of the aux\n";
-        std::cout << "Using basis of: " << basis_indices;
-        solve();
+        #endif
+        std::cout << "optimal\n" << primalSolve().optimal_val << std::endl;
+        std::cout << x_vector.segment(0, num_non_basic_vars).transpose();
         return;
       }
       else {// if(auxResult.state == State::Unbounded)
@@ -312,7 +373,9 @@ void LPSolver::solve()
 
     // Part 2: choose entering variable (Bland's Rule for now)
     auto entering_index = chooseEnteringVariable();
+    #ifdef DEBUG
     std::cout << "Entering variable chosen: " << entering_index << std::endl;
+    #endif
 
     // Part 3: choose leaving variable
     auto highestIncreaseResult = calcHighestIncrease(entering_index);
@@ -323,7 +386,9 @@ void LPSolver::solve()
       return;
     }
 
+    #ifdef DEBUG
     std::cout << "Leaving variable chosen: " << leaving_index << std::endl;
+    #endif
 
     // Part 4: update for next iteration
     x_B -= t * deltaX(leaving_index);
@@ -342,7 +407,6 @@ VectorXd LPSolver::deltaX(size_t j)  {
 
 // NOTE Assumes all possible entering vars have been checked for unboundedness, so don't bother
 // checking here
-// TODO rework how the leaving var is returned
 LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_index)  {
   HighestIncreaseResult result;
   VectorXd delta_x = deltaX(entering_index);
@@ -363,9 +427,15 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_
   }
 
   if(!result.unbounded)  {
+#ifdef DEBUG
     std::cout << "In 'calcHighestIncrease()'; highest increase is: " << result.maxIncrease << std::endl;
+#endif
   } else {
+    HighestIncreaseResult r;
+    #ifdef DEBUG
     std::cout << "In 'calcHighestIncrease()'; unbounded\n";
+    #endif
+    return result;
   }
 
   return result;
@@ -435,8 +505,6 @@ size_t LPSolver::chooseLeavingVariable_Dual() const {
   }
   return 0;
 }
-
-
 
 bool LPSolver::isDualFeasible() {
   z_vector(basis_indices).fill(0.0);

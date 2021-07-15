@@ -52,7 +52,7 @@ private:
   bool isUnbounded();
   bool isOptimal();
 
-  void primalSolve(Eigen::VectorXd const& obj_coeff_vector);
+  LPResult primalSolve();
   LPResult dualSolve(Eigen::VectorXd const& obj_coeff_vector);
 
   size_t num_basic_vars;

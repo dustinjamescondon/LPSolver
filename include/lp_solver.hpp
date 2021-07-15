@@ -15,6 +15,8 @@ public:
   void pivot(size_t entering, size_t leaving);
 
 private:
+  enum  class State { Optimal, Unbounded, Infeasible };
+
   struct HighestIncreaseResult {
     bool unbounded;
     size_t index;
@@ -23,8 +25,7 @@ private:
 
   struct LPResult {
     double optimal_val;
-    bool isUnbounded;
-    bool isInfeasible;
+    State state;
   };
 
   MatrixXd A_B() const;
@@ -34,6 +35,7 @@ private:
   VectorXd c_B() const;
   VectorXd c_N() const;
   VectorXd deltaX(size_t entering_index);
+  VectorXd deltaZ(size_t leaving_index);
 
   double primalObjectiveValue() const;
   double dualObjectiveValue() const;

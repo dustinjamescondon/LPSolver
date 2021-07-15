@@ -14,6 +14,7 @@ bin/lp_solver.o: include/lp_solver.hpp src/lp_solver.cpp
 tests: main
 	./bin/main ./tests/simple_initially_feasible.txt
 	./bin/main ./tests/simple_initially_infeasible.txt
+	./bin/main ./tests/simple_dual_feasible.txt
 
 clean:
 	rm ./bin/*

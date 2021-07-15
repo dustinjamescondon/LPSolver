@@ -189,62 +189,105 @@ double LPSolver::dualObjectiveValue() const {
 
 // TODO this can't be void: need to return if what we found was optimal or unbounded or something
 LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) {
-  {
+  { // Populate z_vector with the current values (based on basis indices)
     z_vector(basis_indices).fill(0.0);
 
-    double v = A_B().transpose().fullPivLu().solve(c_B());
-    z_vector(non_basis_indices) = (A_N().transpose() * v) - c_N();
-  }
-  if(z_vector(non_basis_indices).minCoeff() < 0.0) {
-    // optimal solution to the dual, so return as such
-    LPResult r;
-    r.isUnbounded = false;
-    r.isInfeasible = true;
-    return r;
+    VectorXd v = A_B().transpose().fullPivLu().solve(obj_coeff_vector(basis_indices));
+    z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
+
+    // check for initial feasibility
+    if(z_vector(non_basis_indices).minCoeff() < 0.0) {
+      // infeasible
+      LPResult r;
+      r.state = State::Infeasible;
+      return r;
+    }
   }
 
+  // Otherwise, it is initially feasible, so solve it
   while(true) {
-    size_t leaving_index = chooseLeavingVariable_Dual();
+
+    // Part 1: Compute x and check for optimality
     x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
     x_vector(non_basis_indices).fill(0.0);
 
     if(x_vector(basis_indices).minCoeff() >= 0.0) {
-      return dualObjectiveValue();
+      LPResult r;
+      r.optimal_val = dualObjectiveValue();
+      r.state = State::Optimal;
+
+      return r;
     }
-    // Part 2: choose leaving variable
+
+    // Part 2: Choose leaving variable
     size_t leaving_index = chooseLeavingVariable_Dual();
 
     // Part 3: choose entering variable
+    auto highestIncreaseResult = calcHighestIncrease_Dual(leaving_index);
+    double s = highestIncreaseResult.maxIncrease;
 
-    // NOTE NOTE NOTE NOTE Continue here NOTE NOTE NOTE NOTE
+    if(highestIncreaseResult.unbounded) {
+      std::cout << "unbounded";
+      LPResult r;
+      r.state = State::Unbounded;
+
+      return r;
+    }
+
+    // Part 4: update for the next iteration
+    VectorXd delta_z = deltaZ(leaving_index); // NOTE: we're recalculating this (already calculated in highest increase func)
+
+    z_vector(non_basis_indices) -= s * delta_z(non_basis_indices);
+    z_vector(leaving_index) = s;
+    pivot(highestIncreaseResult.index, leaving_index);
   }
-
 }
+
+
 
 void LPSolver::solve()
 {
-  { // Initialize the x vector and check for initial feasibility
-    auto x_B = x_vector(basis_indices);
-    x_B = calcX_B();
-    auto x_N = x_vector(non_basis_indices);
-    /*  initialize the x values */
-    x_N.fill(0.0);
-    // any of the basic variables are negative, then we don't have a feasible dictionary
-    if(!isPrimalFeasible()) {
-      std::cout << "Initial LP is not primal feasible\n";
-      if(isDualFeasible()) {
-        // then solve the dual LP
-        dualSolve(c_vector);
-        /*
-        if unbounded
-           then primal is infeasible
-        else
-           optimal solution is optimal solution for primal
-        */
-      } else {
-        // Create
+  // Initialize the x vector and check for initial feasibility
+  auto x_B = x_vector(basis_indices);
+  x_B = calcX_B();
+  auto x_N = x_vector(non_basis_indices);
+  /*  initialize the x values */
+  x_N.fill(0.0);
+  // any of the basic variables are negative, then we don't have a feasible dictionary
+  if(!isPrimalFeasible()) {
+    std::cout << "Initial LP is not primal feasible\n";
+    if(isDualFeasible()) {
+      std::cout << "But it is dual feasible!\n";
+      // then solve the dual LP
+      auto result = dualSolve(c_vector);
+      if(result.state == State::Unbounded) {
+        std::cout << "infeasible";
+        return;
       }
+      else {
+        std::cout << "optimal\n"
+                  << result.optimal_val << std::endl
+                  << "Hmm how to translate dual answer...";
+      }
+    }
+    // Otherwise, if it isn't dual-feasible
+    else {
+      std::cout << "And it isn't intially dual-feasible either...\n";
+      // Then find a feasible basis
+      Eigen::VectorXd zero_vector(c_vector.size());
+      zero_vector.fill(0.0);
+      auto auxResult = dualSolve(zero_vector);
 
+      if(auxResult.state == State::Optimal) {
+        std::cout << "Found the optimal of the aux\n";
+        std::cout << "Using basis of: " << basis_indices;
+        solve();
+        return;
+      }
+      else {// if(auxResult.state == State::Unbounded)
+        std::cout << "infeasible";
+      }
+      return;
     }
   }
 
@@ -277,6 +320,7 @@ void LPSolver::solve()
     double t = highestIncreaseResult.maxIncrease;
     if(highestIncreaseResult.unbounded) {
       std::cout << "unbounded";
+      return;
     }
 
     std::cout << "Leaving variable chosen: " << leaving_index << std::endl;
@@ -285,8 +329,8 @@ void LPSolver::solve()
     x_B -= t * deltaX(leaving_index);
     x_vector(entering_index) = t;
     pivot(entering_index, leaving_index);
-    z_vector(basis_indices).fill(0.0);
-    z_vector(non_basis_indices) = calcZ_N();
+    //z_vector(basis_indices).fill(0.0);
+    //z_vector(non_basis_indices) = calcZ_N();
   }
 }
 
@@ -327,8 +371,7 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_
   return result;
 }
 
-LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(unsigned leaving_index) {
-  HighestIncreaseResult result;
+VectorXd LPSolver::deltaZ(size_t leaving_index) {
 
   VectorXd u_vector(basis_indices.size());
   for(size_t k = 0; k < u_vector.size(); ++k) {
@@ -340,6 +383,14 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(unsigned leav
   VectorXd v = A_B().transpose().fullPivLu().solve(u_vector);
 
   delta_z(non_basis_indices) = -A_N().transpose() * v;
+
+  return delta_z;
+}
+
+LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(unsigned leaving_index) {
+  HighestIncreaseResult result;
+
+  VectorXd delta_z = deltaZ(leaving_index);
 
   result.maxIncrease = std::numeric_limits<double>::max();
   result.unbounded = true;

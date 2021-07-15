@@ -325,6 +325,7 @@ void LPSolver::solve()
         std::cout << "optimal\n"
                   << result.optimal_val << std::endl
                   << x_vector.segment(0, num_non_basic_vars).transpose();
+        return;
       }
     }
     // Otherwise, if it isn't dual-feasible
@@ -351,51 +352,12 @@ void LPSolver::solve()
       return;
     }
   }
-
-  // If here, we have an initially feasible dictionary, so solve the LP
-  while(true) {
-    auto z_N = z_vector(non_basis_indices);
-    auto z_B = z_vector(basis_indices);
-    auto x_B = x_vector(basis_indices);
-    auto x_N = x_vector(non_basis_indices);
-
-    // Update the z vector
-    z_B.fill(0.0);
-    z_N = calcZ_N();
-
-    // If every element of Z is non-negative,
-    //   then this is the optimal dictionary
-    if(z_N.minCoeff() >= 0.0) {
-      std::cout << "optimal\n" << primalObjectiveValue() << std::endl;
-      std::cout << x_vector.segment(0, num_non_basic_vars).transpose();
-      return;
-    }
-
-    // Part 2: choose entering variable (Bland's Rule for now)
-    auto entering_index = chooseEnteringVariable();
-    #ifdef DEBUG
-    std::cout << "Entering variable chosen: " << entering_index << std::endl;
-    #endif
-
-    // Part 3: choose leaving variable
-    auto highestIncreaseResult = calcHighestIncrease(entering_index);
-    size_t leaving_index = highestIncreaseResult.index;
-    double t = highestIncreaseResult.maxIncrease;
-    if(highestIncreaseResult.unbounded) {
-      std::cout << "unbounded";
-      return;
-    }
-
-    #ifdef DEBUG
-    std::cout << "Leaving variable chosen: " << leaving_index << std::endl;
-    #endif
-
-    // Part 4: update for next iteration
-    x_B -= t * deltaX(leaving_index);
-    x_vector(entering_index) = t;
-    pivot(entering_index, leaving_index);
-    //z_vector(basis_indices).fill(0.0);
-    //z_vector(non_basis_indices) = calcZ_N();
+  auto result = primalSolve();
+  if(result.state == State::Unbounded) {
+    std::cout << "unbounded";
+  } else {
+    std::cout << "optimal\n" << result.optimal_val << std::endl;
+    std::cout << x_vector.segment(0, num_non_basic_vars).transpose();
   }
 }
 

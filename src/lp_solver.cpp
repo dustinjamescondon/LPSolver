@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <limits>
 
+#define DEBUG
+
 using namespace std;
 
 LPSolver::LPSolver(const char* filename)
@@ -46,7 +48,11 @@ LPSolver::LPSolver(const char* filename)
     stringstream streamified_line(lines[0]);
     string component;
     while(getline(streamified_line, component, ' ')){
-      first_line_components.push_back(component);
+
+      // checking if it's empty will get rid of trailing whitespaces
+      if(!component.empty()) {
+        first_line_components.push_back(component);
+      }
     }
   }
 
@@ -83,7 +89,8 @@ LPSolver::LPSolver(const char* filename)
     string component;
 
     while(getline(streamified_line, component, ' ')) {
-      line_components.push_back(component);
+      if(!component.empty())
+        line_components.push_back(component);
     }
 
     /* Put the constant term into the first column, to get it in dictionary form */
@@ -115,7 +122,9 @@ LPSolver::LPSolver(const char* filename)
   /*--------------------------------------------------*/
 
   #ifdef DEBUG
-  std::cout <<"Here's the LP matrix in equational form:\n" << equational_matrix << std::endl;
+  std::cout << "Here's the objective coefficient vector:\n" << c_vector.transpose() << std::endl;
+  std::cout << "Here's the LP matrix in equational form:\n" << equational_matrix << std::endl;
+  std::cout << "Here's the b vector\n" << b_vector.transpose() << std::endl;
   #endif
 }
 
@@ -291,7 +300,7 @@ LPSolver::LPResult LPSolver::primalSolve() {
     }
 
     // Part 4: update for next iteration
-    x_B -= t * deltaX(leaving_index);
+    x_B -= (deltaX(entering_index)(basis_indices)) * t;
     x_vector(entering_index) = t;
     pivot(entering_index, leaving_index);
   }
@@ -364,7 +373,10 @@ void LPSolver::solve()
 
 // j is the potential entering variable index
 VectorXd LPSolver::deltaX(size_t j)  {
-  return A_B().fullPivLu().solve(equational_matrix.col(j));
+  VectorXd delta_x(num_basic_vars + num_non_basic_vars);
+  delta_x(basis_indices) = A_B().fullPivLu().solve(equational_matrix.col(j));
+  delta_x(non_basis_indices).fill(0.0);
+  return delta_x;
 }
 
 // NOTE Assumes all possible entering vars have been checked for unboundedness, so don't bother
@@ -375,10 +387,9 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_
 
   result.unbounded = true; // if we don't find a valid delta_x index, then it's unbounded
   result.maxIncrease = std::numeric_limits<double>::max();
-  for(size_t i = 0; i < basis_indices.size(); ++i) {
-    size_t basis_index = basis_indices[i];
-    if(delta_x[i] > 0.0) {
-      double fraction = x_vector[basis_index] / delta_x[i];
+  for(auto basis_index : basis_indices) {
+    if(delta_x[basis_index] > 0.0) {
+      double fraction = x_vector[basis_index] / delta_x[basis_index];
 
       if(fraction < result.maxIncrease) {
         result.maxIncrease = fraction;
@@ -393,11 +404,9 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_
     std::cout << "In 'calcHighestIncrease()'; highest increase is: " << result.maxIncrease << std::endl;
 #endif
   } else {
-    HighestIncreaseResult r;
     #ifdef DEBUG
     std::cout << "In 'calcHighestIncrease()'; unbounded\n";
     #endif
-    return result;
   }
 
   return result;
@@ -448,13 +457,12 @@ bool LPSolver::isOptimal()  {
 
 // NOTE: uses Bland's Rule (lowest index)
 size_t LPSolver::chooseEnteringVariable() const {
-  VectorXd z_n = z_vector(non_basis_indices);
-  for(size_t i = 0; i < non_basis_indices.size(); ++i) {
-    if(z_n(i) < 0.0) {
-      return non_basis_indices[i];
+  for(auto basis_index : non_basis_indices) {
+    if(z_vector(basis_index) < 0.0) {
+      return basis_index;
     }
   }
-  return 0; // shouldn't get here
+  return 123456; // shouldn't get here TODO deal with this in a better way
 }
 
 // assumes it's not dual optimal, so there will be a leaving var

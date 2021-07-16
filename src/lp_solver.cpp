@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <limits>
 
-#define DEBUG
+//#define DEBUG
 
 using namespace std;
 
@@ -29,6 +29,13 @@ LPSolver::LPSolver(const char* filename)
     string line;
 
     while(getline(streamified_text, line, '\n')){
+      /*--------------------------------------------------
+        replace any tabs with spaces so we only have to
+        deal with one type of delimiter
+       .................................................. */
+      for(char & c : line)
+        if(c == '\t') c = ' ';
+      /*--------------------------------------------------*/
       lines.push_back(line);
     }
   }
@@ -194,6 +201,17 @@ void LPSolver::pivot(size_t entering, size_t leaving)
   std::sort(non_basis_indices.begin(), non_basis_indices.end(), std::less<unsigned int>());
 }
 
+// Assumes there's at least one variable
+void LPSolver::printOptimalVariableAssignment() const {
+  // print the first component without a leading space
+  printf("%.7g", x_vector(0));
+
+  for(double val : x_vector.segment(1, num_non_basic_vars - 1)) {
+    printf(" %.7g", val);
+  }
+  printf("\n");
+}
+
 double LPSolver::dualObjectiveValue() const {
   return c_vector(basis_indices).dot(A_B().fullPivLu().solve(b_vector));
 }
@@ -351,9 +369,15 @@ void LPSolver::solve()
         #ifdef DEBUG
         std::cout << "Found the optimal of the aux\n";
         #endif
-        std::cout << "optimal\n" << primalSolve().optimal_val << std::endl;
-        std::cout << x_vector.segment(0, num_non_basic_vars).transpose();
-        return;
+        auto result = primalSolve();
+        if(result.state == State::Unbounded) {
+          std::cout <<"unbounded\n";
+        }
+        else { // otherwise it's optimal
+          std::cout << "optimal\n" << result.optimal_val << std::endl;
+          printOptimalVariableAssignment();
+          return;
+        }
       }
       else {// if(auxResult.state == State::Unbounded)
         std::cout << "infeasible";
@@ -365,8 +389,8 @@ void LPSolver::solve()
   if(result.state == State::Unbounded) {
     std::cout << "unbounded";
   } else {
-    std::cout << "optimal\n" << result.optimal_val << std::endl;
-    std::cout << x_vector.segment(0, num_non_basic_vars).transpose();
+    printf("optimal\n%.7g\n", result.optimal_val);
+    printOptimalVariableAssignment();
   }
 }
 
@@ -407,6 +431,7 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_
     #ifdef DEBUG
     std::cout << "In 'calcHighestIncrease()'; unbounded\n";
     #endif
+
   }
 
   return result;
@@ -446,7 +471,6 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(unsigned leav
       }
     }
   }
-
   return result;
 }
 
@@ -454,8 +478,7 @@ bool LPSolver::isOptimal()  {
   return calcZ_N().minCoeff() >= 0.0;
 }
 
-
-// NOTE: uses Bland's Rule (lowest index)
+// NOTE: uses Bland's Rule (lowest index index)
 size_t LPSolver::chooseEnteringVariable() const {
   for(auto basis_index : non_basis_indices) {
     if(z_vector(basis_index) < 0.0) {

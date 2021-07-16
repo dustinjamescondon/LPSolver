@@ -39,6 +39,7 @@ private:
 
   double primalObjectiveValue() const;
   double dualObjectiveValue() const;
+  void printOptimalVariableAssignment() const;
 
   HighestIncreaseResult calcHighestIncrease(unsigned int entering_index);
   HighestIncreaseResult calcHighestIncrease_Dual(unsigned int leaving_index);

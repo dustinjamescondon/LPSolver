@@ -16,6 +16,9 @@ tests: main
 	./bin/main ./tests/simple_initially_infeasible.txt
 	./bin/main ./tests/simple_dual_feasible.txt
 
+test_infeasible: main
+	./bin/main ./tests/test_LPs/input/vanderbei_exercise2.7.txt
+
 clean:
 	rm ./bin/*
 

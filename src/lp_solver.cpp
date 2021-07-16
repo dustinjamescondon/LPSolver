@@ -349,9 +349,8 @@ void LPSolver::solve()
         return;
       }
       else {
-        std::cout << "optimal\n"
-                  << result.optimal_val << std::endl
-                  << x_vector.segment(0, num_non_basic_vars).transpose();
+        printf("optimal\n%.7g\n", result.optimal_val);
+        printOptimalVariableAssignment();
         return;
       }
     }

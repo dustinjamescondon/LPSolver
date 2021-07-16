@@ -1,0 +1,120 @@
+solving ./test_LPs/input/vanderbei_example14.1.txt:
+optimal
+-1109
+6 6 0 12 0 0 0 0 0 9 0 0 3 2
+optimal
+-1109
+6 6 0 12 0 0 0 0 0 9 0 0 3 2
+passed
+solving ./test_LPs/input/vanderbei_example2.1.txt:
+optimal
+13
+2 0 1
+optimal
+13
+2 0 1
+passed
+solving ./test_LPs/input/vanderbei_example3.6.txt:
+optimal
+7
+3 2 0
+optimal
+7
+3 2 0
+passed
+solving ./test_LPs/input/vanderbei_example5.6.txt:
+optimal
+-7
+7 0
+optimal
+-7
+7 0
+passed
+solving ./test_LPs/input/vanderbei_example6.3.txt:
+optimal
+31
+4 5
+optimal
+31
+4 5
+passed
+solving ./test_LPs/input/vanderbei_exercise2.10.txt:
+optimal
+9
+0 0 0 1
+optimal
+9
+0 0 0 1
+passed
+solving ./test_LPs/input/vanderbei_exercise2.11.txt:
+optimal
+11
+0 1 0 0 0 1
+optimal
+11
+0 1 0 0 0 1
+passed
+solving ./test_LPs/input/vanderbei_exercise2.1.txt:
+optimal
+17
+2 -2.775558e-17 1 0
+optimal
+17
+2 0 1 0
+failed
+solving ./test_LPs/input/vanderbei_exercise2.2.txt:
+optimal
+2
+1 0
+optimal
+2
+1 0
+passed
+solving ./test_LPs/input/vanderbei_exercise2.3.txt:
+optimal
+-3
+0 0.5 1.5
+optimal
+-3
+0 0.5 1.5
+passed
+solving ./test_LPs/input/vanderbei_exercise2.4.txt:
+optimal
+-3
+0 1 0
+optimal
+-3
+0 1 0
+passed
+solving ./test_LPs/input/vanderbei_exercise2.5.txt:
+optimal
+5
+2 1
+optimal
+5
+2 1
+passed
+solving ./test_LPs/input/vanderbei_exercise2.6.txt:
+infeasible
+infeasible
+passed
+solving ./test_LPs/input/vanderbei_exercise2.7.txt:
+unbounded
+unbounded
+passed
+solving ./test_LPs/input/vanderbei_exercise2.8.txt:
+optimal
+28
+4 8
+optimal
+28
+4 8
+passed
+solving ./test_LPs/input/vanderbei_exercise2.9.txt:
+optimal
+11
+1 3 0
+optimal
+11
+1 3 0
+passed

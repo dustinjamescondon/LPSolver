@@ -249,7 +249,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     }
 
     // Part 2: Choose leaving variable
-    size_t leaving_index = chooseLeavingVariable_Dual();
+    size_t leaving_index = chooseDualLeavingVariable_blandsRule();
 
     // Part 3: choose entering variable
     auto highestIncreaseResult = calcHighestIncrease_Dual(leaving_index);
@@ -265,7 +265,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     // Part 4: update for the next iteration
     VectorXd delta_z = deltaZ(leaving_index); // NOTE: we're recalculating this (already calculated in highest increase func)
 
-    z_vector(non_basis_indices) -= s * delta_z(non_basis_indices);
+    z_vector(non_basis_indices) -= (s * delta_z(non_basis_indices));
     z_vector(leaving_index) = s;
     pivot(highestIncreaseResult.index, leaving_index);
   }
@@ -373,10 +373,26 @@ void LPSolver::solve()
           std::cout <<"unbounded\n";
         }
         else { // otherwise it's optimal
-          std::cout << "optimal\n" << result.optimal_val << std::endl;
+          printf("optimal\n%.7g\n", result.optimal_val);
           printOptimalVariableAssignment();
           return;
         }
+      }
+      else if(auxResult.state == State::Unbounded) {
+        std::cout << "Oh dear, it appears the aux is unbounded..." << std::endl;
+        auto result = primalSolve();
+        if(result.state == State::Optimal) {
+          std::cout << "Oh goodie\n";
+
+        }
+        else if(result.state == State::Unbounded) {
+          std::cout << "Unbounded, oh dear\n";
+
+        }
+        else {
+          std::cout <<"infeasible, oh boy\n";
+        }
+        return;
       }
       else {// if(auxResult.state == State::Unbounded)
         std::cout << "infeasible";
@@ -443,10 +459,13 @@ VectorXd LPSolver::deltaZ(size_t leaving_index) {
     u_vector(k) = (basis_indices(k) == leaving_index ? 1.0 : 0.0);
   }
 
+  // make sure the leaving_index parameter is valid
+  assert(u_vector.maxCoeff() == 1.0);
+
   VectorXd delta_z(num_basic_vars + num_non_basic_vars);
-  delta_z.fill(0.0);
   VectorXd v = A_B().transpose().fullPivLu().solve(u_vector);
 
+  delta_z(basis_indices).fill(0.0);
   delta_z(non_basis_indices) = -A_N().transpose() * v;
 
   return delta_z;
@@ -459,8 +478,7 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(unsigned leav
 
   result.maxIncrease = std::numeric_limits<double>::max();
   result.unbounded = true;
-  for(size_t i = 0; i < non_basis_indices.size(); ++i) {
-    size_t non_basis_index = non_basis_indices(i);
+  for(auto non_basis_index : non_basis_indices) {
     if(delta_z(non_basis_index) > 0.0) {
       result.unbounded = false;
       double fraction = z_vector(non_basis_index) / delta_z(non_basis_index);
@@ -488,14 +506,33 @@ size_t LPSolver::chooseEnteringVariable() const {
 }
 
 // assumes it's not dual optimal, so there will be a leaving var
-size_t LPSolver::chooseLeavingVariable_Dual() const {
-  VectorXd x_B = x_vector(basis_indices);
-  for(size_t i = 0; i < basis_indices.size(); ++i) {
-    if(x_B(i) < 0.0) {
-      return basis_indices(i);
+size_t LPSolver::chooseDualLeavingVariable_blandsRule() const {
+  bool foundOne = false;
+  size_t leaving_index;
+  for(auto basis_index : basis_indices) {
+    if(x_vector(basis_index) < 0.0) {
+      foundOne = true;
+      leaving_index = basis_index;
+      break;
     }
   }
-  return 0;
+  assert(foundOne);
+  return leaving_index;
+}
+
+// assumes it's not dual optimal, so there will be a leaving var
+size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
+  double max = 0.0;
+  size_t max_index = 0;
+  for(auto basis_index : basis_indices) {
+    if(x_vector(basis_index) < 0.0) {
+      if(-x_vector(basis_index) > max) {
+        max = -x_vector(basis_index);
+        max_index = basis_index;
+      }
+    }
+  }
+  return max_index;
 }
 
 bool LPSolver::isDualFeasible() {

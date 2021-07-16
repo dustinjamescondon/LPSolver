@@ -45,7 +45,8 @@ private:
   HighestIncreaseResult calcHighestIncrease_Dual(unsigned int leaving_index);
 
   size_t chooseEnteringVariable() const;
-  size_t chooseLeavingVariable_Dual() const;
+  size_t chooseDualLeavingVariable_largestCoeff() const;
+  size_t chooseDualLeavingVariable_blandsRule() const;
   void findInitialFeasibleDictionary();
 
   bool isPrimalFeasible() const;

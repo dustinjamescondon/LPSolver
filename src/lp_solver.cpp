@@ -215,8 +215,8 @@ void LPSolver::printOptimalVariableAssignment() const {
   printf("\n");
 }
 
-double LPSolver::dualObjectiveValue() const {
-  return c_vector(basis_indices).dot(A_B().fullPivLu().solve(b_vector));
+double LPSolver::dualObjectiveValue(VectorXd const& obj_coeff_vector) const {
+  return obj_coeff_vector(basis_indices).dot(A_B().fullPivLu().solve(b_vector));
 }
 
 LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) {
@@ -250,7 +250,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
 
     if(x_vector(basis_indices).minCoeff() >= -epsilon) {
       LPResult r;
-      r.optimal_val = dualObjectiveValue();
+      r.optimal_val = dualObjectiveValue(obj_coeff_vector);
       r.state = State::Optimal;
 
       return r;

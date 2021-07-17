@@ -1,1 +1,7 @@
 #+TITLE: Readme
+
+
+* TODOs
+
+** TODO Try looking for near-zero matrix entries and making them zero
+** TODO Try another system of equation solver

@@ -38,7 +38,7 @@ private:
   VectorXd deltaZ(size_t leaving_index);
 
   double primalObjectiveValue() const;
-  double dualObjectiveValue() const;
+  double dualObjectiveValue(VectorXd const& obj_coeff_vector) const;
   void printOptimalVariableAssignment() const;
 
   HighestIncreaseResult calcHighestIncrease(unsigned int entering_index);

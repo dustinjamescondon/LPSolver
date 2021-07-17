@@ -25,6 +25,10 @@ test_medium: main
 	./bin/main ./tests/test_LPs/input/netlib_afiro.txt
 test_loop: main
 	./bin/main ./tests/test_LPs/input/netlib_klein1.txt
+test_all: main
+	./tests/test_vanderbei.sh
+	./tests/test_netlib.sh
+
 clean:
 	rm ./bin/*
 

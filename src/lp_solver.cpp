@@ -216,13 +216,16 @@ double LPSolver::dualObjectiveValue() const {
   return c_vector(basis_indices).dot(A_B().fullPivLu().solve(b_vector));
 }
 
-// TODO this can't be void: need to return if what we found was optimal or unbounded or something
 LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) {
-  { // Populate z_vector with the current values (based on basis indices)
+  { /*-------------------------------------------------------------
+     * Populate z_vector with the current values
+     * (based on basis indices)
+     * .............................................................*/
     z_vector(basis_indices).fill(0.0);
 
     VectorXd v = A_B().transpose().fullPivLu().solve(obj_coeff_vector(basis_indices));
     z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
+    /*-------------------------------------------------------------*/
 
     // check for initial feasibility
     if(z_vector(non_basis_indices).minCoeff() < 0.0) {
@@ -233,10 +236,12 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     }
   }
 
-  // Otherwise, it is initially feasible, so solve it
+  // If here, it is initially feasible, so solve it
   while(true) {
 
-    // Part 1: Compute x and check for optimality
+    /*--------------------------------------------------
+     * Part 1: Compute x and check for optimality
+     *.................................................. */
     x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
     x_vector(non_basis_indices).fill(0.0);
 
@@ -248,10 +253,14 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
       return r;
     }
 
-    // Part 2: Choose leaving variable
+    /*--------------------------------------------------
+     * Part 2: Choose leaving variable
+     *..................................................*/
     size_t leaving_index = chooseDualLeavingVariable_blandsRule();
 
-    // Part 3: choose entering variable
+    /*--------------------------------------------------
+     * Part 3: choose entering variable
+     *..................................................*/
     auto highestIncreaseResult = calcHighestIncrease_Dual(leaving_index);
     double s = highestIncreaseResult.maxIncrease;
 
@@ -262,7 +271,9 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
       return r;
     }
 
-    // Part 4: update for the next iteration
+    /*--------------------------------------------------
+     * Part 4: update for the next iteration
+     *.................................................. */
     VectorXd delta_z = deltaZ(leaving_index); // NOTE: we're recalculating this (already calculated in highest increase func)
 
     z_vector(non_basis_indices) -= (s * delta_z(non_basis_indices));

@@ -5,8 +5,11 @@
 #include <iostream>
 #include <algorithm>
 #include <limits>
+#include <cmath>
 
-//#define DEBUG
+#define DEBUG
+
+const double epsilon = 1.0e-6;
 
 using namespace std;
 
@@ -128,11 +131,11 @@ LPSolver::LPSolver(const char* filename)
   }
   /*--------------------------------------------------*/
 
-  #ifdef DEBUG
-  std::cout << "Here's the objective coefficient vector:\n" << c_vector.transpose() << std::endl;
-  std::cout << "Here's the LP matrix in equational form:\n" << equational_matrix << std::endl;
-  std::cout << "Here's the b vector\n" << b_vector.transpose() << std::endl;
-  #endif
+  // #ifdef DEBUG
+  // std::cout << "Here's the objective coefficient vector:\n" << c_vector.transpose() << std::endl;
+  // std::cout << "Here's the LP matrix in equational form:\n" << equational_matrix << std::endl;
+  // std::cout << "Here's the b vector\n" << b_vector.transpose() << std::endl;
+  // #endif
 }
 
 // assume the basis indices are sorted?
@@ -245,7 +248,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
     x_vector(non_basis_indices).fill(0.0);
 
-    if(x_vector(basis_indices).minCoeff() >= 0.0) {
+    if(x_vector(basis_indices).minCoeff() >= -epsilon) {
       LPResult r;
       r.optimal_val = dualObjectiveValue();
       r.state = State::Optimal;
@@ -256,7 +259,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     /*--------------------------------------------------
      * Part 2: Choose leaving variable
      *..................................................*/
-    size_t leaving_index = chooseDualLeavingVariable_blandsRule();
+    size_t leaving_index = chooseDualLeavingVariable_largestCoeff();
 
     /*--------------------------------------------------
      * Part 3: choose entering variable

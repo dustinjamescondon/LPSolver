@@ -7,9 +7,9 @@
 #include <limits>
 #include <cmath>
 
-#define DEBUG
+//#define DEBUG
 
-const double epsilon = 1.0e-6;
+const double epsilon = 1.0e-10;
 
 using namespace std;
 
@@ -138,8 +138,6 @@ LPSolver::LPSolver(const char* filename)
   // #endif
 }
 
-// assume the basis indices are sorted?
-// TODO do we need this to be a direct reference of the block in A?
 MatrixXd LPSolver::A_B() const
 {
   MatrixXd m(num_basic_vars, num_basic_vars);
@@ -158,7 +156,6 @@ MatrixXd LPSolver::A_N() const
   return m;
 }
 
-// When do we need to calculate this?
 VectorXd LPSolver::calcX_B() const
 {
   return A_B().fullPivLu().solve(b_vector);
@@ -248,7 +245,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
     x_vector(non_basis_indices).fill(0.0);
 
-    if(x_vector(basis_indices).minCoeff() >= -epsilon) {
+    if(x_vector(basis_indices).minCoeff() >= 0.0) {
       LPResult r;
       r.optimal_val = dualObjectiveValue(obj_coeff_vector);
       r.state = State::Optimal;
@@ -259,12 +256,12 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     /*--------------------------------------------------
      * Part 2: Choose leaving variable
      *..................................................*/
-    size_t leaving_index = chooseDualLeavingVariable_largestCoeff();
-
+    size_t leaving_index = chooseDualLeavingVariable_blandsRule();
+    VectorXd delta_z = deltaZ(leaving_index);
     /*--------------------------------------------------
      * Part 3: choose entering variable
      *..................................................*/
-    auto highestIncreaseResult = calcHighestIncrease_Dual(leaving_index);
+    auto highestIncreaseResult = calcHighestIncrease_Dual(delta_z);
     double s = highestIncreaseResult.maxIncrease;
 
     if(highestIncreaseResult.unbounded) {
@@ -277,8 +274,6 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     /*--------------------------------------------------
      * Part 4: update for the next iteration
      *.................................................. */
-    VectorXd delta_z = deltaZ(leaving_index); // NOTE: we're recalculating this (already calculated in highest increase func)
-
     z_vector(non_basis_indices) -= (s * delta_z(non_basis_indices));
     z_vector(leaving_index) = s;
     pivot(highestIncreaseResult.index, leaving_index);
@@ -393,23 +388,13 @@ void LPSolver::solve()
         }
       }
       else if(auxResult.state == State::Unbounded) {
-        std::cout << "Oh dear, it appears the aux is unbounded..." << std::endl;
-        auto result = primalSolve();
-        if(result.state == State::Optimal) {
-          std::cout << "Oh goodie\n";
-
-        }
-        else if(result.state == State::Unbounded) {
-          std::cout << "Unbounded, oh dear\n";
-
-        }
-        else {
-          std::cout <<"infeasible, oh boy\n";
-        }
-        return;
+#ifdef DEBUG
+        std::cout << "Oh dear, the aux is unbounded..." << std::endl;
+#endif
+        std::cout << "infeasible\n";
       }
       else {// if(auxResult.state == State::Unbounded)
-        std::cout << "infeasible";
+        std::cout << "infeasible\n";
       }
       return;
     }
@@ -432,8 +417,6 @@ VectorXd LPSolver::deltaX(size_t j)  {
   return delta_x;
 }
 
-// NOTE Assumes all possible entering vars have been checked for unboundedness, so don't bother
-// checking here
 LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_index)  {
   HighestIncreaseResult result;
   VectorXd delta_x = deltaX(entering_index);
@@ -485,10 +468,8 @@ VectorXd LPSolver::deltaZ(size_t leaving_index) {
   return delta_z;
 }
 
-LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(unsigned leaving_index) {
+LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd const& delta_z) {
   HighestIncreaseResult result;
-
-  VectorXd delta_z = deltaZ(leaving_index);
 
   result.maxIncrease = std::numeric_limits<double>::max();
   result.unbounded = true;
@@ -502,6 +483,12 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(unsigned leav
       }
     }
   }
+#ifdef DEBUG
+  printf("In calcHighestIncrease_Dual: it is : %.10g\n", result.maxIncrease);
+#endif
+  if(result.maxIncrease < epsilon)
+    result.maxIncrease = 0.0;
+
   return result;
 }
 
@@ -562,22 +549,4 @@ bool LPSolver::isPrimalFeasible() const {
 
   // if all the X_B coefficients are non-negative, it's infeasible
   return (x_B.minCoeff() >= 0.0);
-}
-
-/* Returns if the basis is unbounded or not
-   NOTE assumes the current dictionary isn't optimal, so need to check that before calling this
-   method */
-bool LPSolver::isUnbounded()
-{
-  VectorXd z_n = calcZ_N();
-  // look through all possible entering variables to see if they can be increased arbitrariy large
-  for(size_t i = 0; i < z_n.size(); ++i) {
-    // if it's negative, that means the basis variable can be increased, so look at this one
-    if(z_n[i] < 0.0) {
-      VectorXd deltaX_i = deltaX(non_basis_indices[i]);
-      if(deltaX_i.minCoeff()<= 0.0)
-        return true;
-    }
-  }
-  return false;
 }

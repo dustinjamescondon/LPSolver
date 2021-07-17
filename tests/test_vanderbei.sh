@@ -10,14 +10,17 @@ for (( i=0; i<$len; i++))
 do
     echo "solving ${INPFILES[$i]}:"
     output=$(../bin/main ${INPFILES[$i]})
-    echo "$output"
     exp_output=$(cat ${EXPFILES[$i]})
-    echo "$exp_output"
 
-    if [[ $output = $exp_output ]]; then
+
+    if [[ $(echo "$output" | cut -f1 -d$'\n') = $(echo "$exp_output" | cut -f1 -d$'\n') ]]; then
         echo "passed"
     else
         echo "failed"
+        echo "expected:"
+        echo "$exp_output"
+        echo "got:"
+        echo "$output"
     fi
 
 done

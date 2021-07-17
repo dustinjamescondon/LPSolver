@@ -42,7 +42,7 @@ private:
   void printOptimalVariableAssignment() const;
 
   HighestIncreaseResult calcHighestIncrease(unsigned int entering_index);
-  HighestIncreaseResult calcHighestIncrease_Dual(unsigned int leaving_index);
+  HighestIncreaseResult calcHighestIncrease_Dual(VectorXd const& delta_z);
 
   size_t chooseEnteringVariable() const;
   size_t chooseDualLeavingVariable_largestCoeff() const;
@@ -51,7 +51,6 @@ private:
 
   bool isPrimalFeasible() const;
   bool isDualFeasible();
-  bool isUnbounded();
   bool isOptimal();
 
   LPResult primalSolve();

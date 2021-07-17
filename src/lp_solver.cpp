@@ -9,7 +9,7 @@
 
 //#define DEBUG
 
-const double epsilon = 1.0e-5;
+const double epsilon = 1.0e-10;
 
 VectorXd zeroifySmallValues(VectorXd vals) {
   for(double& val: vals) {
@@ -210,6 +210,8 @@ void LPSolver::pivot(size_t entering, size_t leaving)
   std::sort(non_basis_indices.begin(), non_basis_indices.end(), std::less<unsigned int>());
 }
 
+//bool isDualUnbounded() const {}
+
 // Assumes there's at least one variable
 void LPSolver::printOptimalVariableAssignment() const {
   // print the first component without a leading space
@@ -292,7 +294,6 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     VectorXd v = A_B().transpose().fullPivLu().solve(obj_coeff_vector(basis_indices));
     z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
     z_vector(non_basis_indices) = zeroifySmallValues(z_vector(non_basis_indices));
-
   }
 }
 
@@ -323,7 +324,7 @@ LPSolver::LPResult LPSolver::primalSolve() {
     }
 
     // Part 2: choose entering variable (Bland's Rule for now)
-    auto entering_index = chooseEnteringVariable();
+    auto entering_index = chooseEnteringVariable_blandsRule();
 
     // Part 3: choose leaving variable
     auto highestIncreaseResult = calcHighestIncrease(entering_index);
@@ -498,14 +499,12 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd cons
 #ifdef DEBUG
   printf("In calcHighestIncrease_Dual: it is : %.10g\n", result.maxIncrease);
 #endif
-  if(result.maxIncrease < epsilon)
-    result.maxIncrease = 0.0;
 
   return result;
 }
 
 // NOTE: uses Bland's Rule (lowest index index)
-size_t LPSolver::chooseEnteringVariable() const {
+size_t LPSolver::chooseEnteringVariable_blandsRule() const {
   for(auto basis_index : non_basis_indices) {
     if(z_vector(basis_index) < -epsilon) {
       return basis_index;

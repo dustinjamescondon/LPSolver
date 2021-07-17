@@ -11,8 +11,14 @@ do
     output=$(./bin/main ${INPFILES[$i]})
     exp_output=$(cat ${EXPFILES[$i]})
 
-
+    passed=false
     if [[ $(echo "$output" | cut -f1 -d$'\n') = $(echo "$exp_output" | cut -f1 -d$'\n') ]]; then
+        if [[ $(echo "$output" | cut -f2 -d$'\n') = $(echo "$exp_output" | cut -f2 -d$'\n') ]]; then
+            passed=true
+        fi
+    fi
+
+    if [ "$passed" = true ]; then
         echo "passed"
     else
         echo "--------------------------------------------------"
@@ -25,5 +31,4 @@ do
         echo "$output"
         echo "--------------------------------------------------"
     fi
-
 done

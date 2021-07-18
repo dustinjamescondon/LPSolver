@@ -9,7 +9,7 @@
 
 //#define DEBUG
 
-const double epsilon = 1.0e-10;
+const double epsilon = 1.0e-7;
 
 VectorXd zeroifySmallValues(VectorXd vals) {
   for(double& val: vals) {
@@ -141,29 +141,38 @@ LPSolver::LPSolver(const char* filename)
   /*--------------------------------------------------*/
 
   isDecompStale = true;
-  // #ifdef DEBUG
-  // std::cout << "Here's the objective coefficient vector:\n" << c_vector.transpose() << std::endl;
-  // std::cout << "Here's the LP matrix in equational form:\n" << equational_matrix << std::endl;
-  // std::cout << "Here's the b vector\n" << b_vector.transpose() << std::endl;
-  // #endif
+  areSubmatricesStale = true;
+  A_B_cached.resize(num_basic_vars, num_basic_vars);
+  A_N_cached.resize(num_basic_vars, num_non_basic_vars);
+}
+
+void LPSolver::updateSubmatrices() const {
+  for(size_t col = 0; col < num_basic_vars; ++col) {
+    A_B_cached.col(col) = equational_matrix.col(basis_indices(col));
+  }
+  for(size_t col = 0; col < num_non_basic_vars; ++col) {
+    A_N_cached.col(col) = equational_matrix.col(non_basis_indices(col));
+  }
 }
 
 MatrixXd LPSolver::A_B() const
 {
-  MatrixXd m(num_basic_vars, num_basic_vars);
-  for(size_t col = 0; col < num_basic_vars; ++col) {
-    m.col(col) = equational_matrix.col(basis_indices(col));
+  if(areSubmatricesStale) {
+    updateSubmatrices();
+    areSubmatricesStale = false;
   }
-  return m;
+
+  return A_B_cached;
 }
 
+// TODO: i'm repeating my self here
 MatrixXd LPSolver::A_N() const
 {
-  MatrixXd m(num_basic_vars, num_non_basic_vars);
-  for(size_t col = 0; col < num_non_basic_vars; ++col) {
-    m.col(col) = equational_matrix.col(non_basis_indices(col));
+  if(areSubmatricesStale) {
+    updateSubmatrices();
+    areSubmatricesStale = false;
   }
-  return m;
+  return A_N_cached;
 }
 
 VectorXd LPSolver::calcX_B() const
@@ -211,6 +220,7 @@ void LPSolver::pivot(size_t entering, size_t leaving)
   std::sort(non_basis_indices.begin(), non_basis_indices.end(), std::less<unsigned int>());
 
   isDecompStale = true;
+  areSubmatricesStale = true;
 }
 
 //bool isDualUnbounded() const {}
@@ -230,20 +240,18 @@ double LPSolver::dualObjectiveValue(VectorXd const& obj_coeff_vector) const {
   return obj_coeff_vector(basis_indices).dot(solveA_B_x_equals_b(b_vector));
 }
 
-
-// TODO make this reuse the factorization
 VectorXd LPSolver::solveA_B_transpose_x_equals_b(VectorXd const& b) const {
   if(isDecompStale) {
-    A_B_decomp = A_B().fullPivLu();
+    A_B_decomp = A_B().colPivHouseholderQr();
     isDecompStale = false;
   }
   return A_B_decomp.transpose().solve(b);
 }
 
-// TODO make this reuse the factorization
+
 VectorXd LPSolver::solveA_B_x_equals_b(VectorXd const& b) const {
   if(isDecompStale) {
-    A_B_decomp = A_B().fullPivLu();
+    A_B_decomp = A_B().colPivHouseholderQr();
     isDecompStale = false;
   }
 
@@ -314,14 +322,9 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     /*--------------------------------------------------
      * Part 4: update for the next iteration
      *.................................................. */
-    //z_vector(non_basis_indices) -= (s * delta_z(non_basis_indices));
-    //z_vector(leaving_index) = s;
+    z_vector(non_basis_indices) -= (s * delta_z(non_basis_indices));
+    z_vector(leaving_index) = s;
     pivot(entering_index, leaving_index);
-
-    z_vector(basis_indices).fill(0.0);
-    VectorXd v = solveA_B_transpose_x_equals_b(obj_coeff_vector(basis_indices));
-    z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
-    z_vector(non_basis_indices) = zeroifySmallValues(z_vector(non_basis_indices));
 
     // pivot_count++;
     // if(pivot_count%1 == 0) {

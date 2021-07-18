@@ -60,13 +60,17 @@ private:
   LPResult primalSolve();
   LPResult dualSolve(Eigen::VectorXd const& obj_coeff_vector);
 
+  void updateSubmatrices() const;
+
   /*--------------------------------------------------
    * mutable because these are basically used for caching
    * inverse operations and therefore need to be used in const methods*
    *.................................................. */
   mutable bool isDecompStale;
-  mutable Eigen::FullPivLU<Eigen::MatrixXd> A_B_decomp;
-  mutable Eigen::FullPivLU<Eigen::MatrixXd> A_B_transpose_decomp;
+  mutable bool areSubmatricesStale;
+  mutable Eigen::ColPivHouseholderQR<Eigen::MatrixXd> A_B_decomp;
+  mutable Eigen::MatrixXd A_B_cached;
+  mutable Eigen::MatrixXd A_N_cached;
 
 
   size_t num_basic_vars;

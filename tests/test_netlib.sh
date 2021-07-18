@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-INPFILES=(./tests/test_LPs/input/netlib*.txt)
-EXPFILES=(./tests/test_LPs/output/netlib*.txt)
+INPFILES=(./tests/test_LPs/input/netlib_*.txt)
+EXPFILES=(./tests/test_LPs/output/netlib_*.txt)
 
 len=${#INPFILES[@]}
 

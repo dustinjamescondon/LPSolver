@@ -1,7 +1,7 @@
-#+TITLE: Readme
+#+TITLE: LPSolver ReadMe
+#+AUTHOR: Dustin Condon
 
+* Building
+Change directory to the same directory as Makefile (same directory as this REAMDE) and run make. This will populate the bin/ directory with the executable "main". To run, the solver, forward standard input to the executable like so: ./bin/main < someinputfile.txt
 
-* TODOs
-
-** TODO Try looking for near-zero matrix entries and making them zero
-** TODO Try another system of equation solver
+* Features

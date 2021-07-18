@@ -1,3 +1,8 @@
+/*
+ * Author: Dustin Condon
+ * V#    : V00915786
+ */
+
 #pragma once
 
 #include <string>

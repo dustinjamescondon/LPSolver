@@ -1,3 +1,8 @@
+/*
+ * Author: Dustin Condon
+ * V#    : V00915786
+ */
+
 #include "lp_solver.hpp"
 #include <string>
 #include <vector>

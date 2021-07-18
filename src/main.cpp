@@ -1,7 +1,10 @@
+/*
+ * Author: Dustin Condon
+ * V#    : V00915786
+ */
+
 #include <iostream>
 #include "lp_solver.hpp"
-
-using namespace std;
 
 int main(int argc, char *argv[]) {
 

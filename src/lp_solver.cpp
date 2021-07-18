@@ -9,16 +9,22 @@
 
 //#define DEBUG
 
-const double epsilon = 1.0e-10;
+const double epsilon = 1.0e-9;
 
 // if a value is smaller than epsilon, then set it to zero
 VectorXd zeroify(VectorXd vals) {
   for(double& val: vals) {
-    if(std::abs(val) < epsilon)
+    if(std::abs(val) <= epsilon)
       val = 0.0;
   }
 
   return vals;
+}
+
+// if a value is smaller than epsilon, then set it to zero
+void zeroify(double& val) {
+  if(std::abs(val) <= epsilon)
+    val = 0.0;
 }
 
 using namespace std;
@@ -306,14 +312,17 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     size_t entering_index = 1234567; // something that will fail if not overwritten
 
     for(size_t non_basis_index : non_basis_indices) {
-      if(delta_z(non_basis_index) > epsilon) {
-        if(std::abs((z_vector(non_basis_index) / delta_z(non_basis_index)) - s) < epsilon) {
+      if(delta_z(non_basis_index) >= epsilon) {
+        if(std::abs((z_vector(non_basis_index) / delta_z(non_basis_index)) - s) <= epsilon) {
           entering_index = non_basis_index;
           break;
         }
       }
     }
-    //printf("entering %i    leaving %i\n", entering_index, leaving_index);
+
+#ifdef DEBUG
+    printf("Dual: entering %i    leaving %i\n", entering_index, leaving_index);
+#endif
 
     /*--------------------------------------------------
      * Part 4: update for the next iteration
@@ -361,15 +370,17 @@ LPSolver::LPResult LPSolver::primalSolve() {
     double t = highestIncreaseResult.maxIncrease;
 
     for(size_t basis_index : basis_indices) {
-      if(delta_x(basis_index) > epsilon) {
-        if(std::abs((x_vector(basis_index)/delta_x(basis_index)) - t) < epsilon) {
+      if(delta_x(basis_index) >= epsilon) {
+        if(std::abs((x_vector(basis_index)/delta_x(basis_index)) - t) <= epsilon) {
           leaving_index = basis_index;
           break;
         }
       }
     }
 
-    //printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
+#ifdef DEBUG
+    printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
+#endif
 
     // Part 4: update for next iteration
     pivot(entering_index, leaving_index);
@@ -469,7 +480,7 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& de
   result.unbounded = true; // if we don't find a valid delta_x index, then it's unbounded
   result.maxIncrease = std::numeric_limits<double>::max();
   for(auto basis_index : basis_indices) {
-    if(delta_x(basis_index) > epsilon) {
+    if(delta_x(basis_index) >= epsilon) {
       double fraction = x_vector(basis_index) / delta_x(basis_index);
 
       if(fraction < result.maxIncrease) {
@@ -507,7 +518,7 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd cons
   result.maxIncrease = std::numeric_limits<double>::max();
   result.unbounded = true;
   for(auto non_basis_index : non_basis_indices) {
-    if(delta_z(non_basis_index) > epsilon) {
+    if(delta_z(non_basis_index) >= epsilon) {
       result.unbounded = false;
       double fraction = z_vector(non_basis_index) / delta_z(non_basis_index);
       if(fraction < result.maxIncrease) {
@@ -522,7 +533,7 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd cons
 // NOTE: uses Bland's Rule (lowest index index)
 size_t LPSolver::choosePrimalEnteringVariable_blandsRule() const {
   for(auto non_basis_index : non_basis_indices) {
-    if(z_vector(non_basis_index) < -epsilon) {
+    if(z_vector(non_basis_index) <= -epsilon) {
       return non_basis_index;
     }
   }
@@ -533,7 +544,7 @@ size_t LPSolver::choosePrimalEnteringVariable_blandsRule() const {
 // assumes it's not dual optimal, so there will be a leaving var
 size_t LPSolver::chooseDualLeavingVariable_blandsRule() const {
   for(auto basis_index : basis_indices) {
-    if(x_vector(basis_index) < -epsilon) {
+    if(x_vector(basis_index) <= -epsilon) {
       return basis_index;
     }
   }
@@ -546,7 +557,7 @@ size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
   double max = 0.0;
   size_t max_index = 0;
   for(auto basis_index : basis_indices) {
-    if(x_vector(basis_index) < -epsilon) {
+    if(x_vector(basis_index) <= -epsilon) {
       if(-x_vector(basis_index) > max) {
         max = -x_vector(basis_index);
         max_index = basis_index;
@@ -557,19 +568,19 @@ size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
 }
 
 bool LPSolver::isDualFeasible() const {
-  return (z_vector(non_basis_indices).minCoeff() > -epsilon);
+  return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
 }
 
 // NOTE: assumes the x_vector is up to date
 bool LPSolver::isPrimalFeasible() const {
   // if all the X_B coefficients are non-negative, it's infeasible
-  return (x_vector(basis_indices).minCoeff() > -epsilon);
+  return (x_vector(basis_indices).minCoeff() >= -epsilon);
 }
 
 bool LPSolver::isPrimalOptimal() const {
-  return (z_vector(non_basis_indices).minCoeff() > -epsilon);
+  return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
 }
 
 bool LPSolver::isDualOptimal() const {
-  return (x_vector(basis_indices).minCoeff() > -epsilon);
+  return (x_vector(basis_indices).minCoeff() >= -epsilon);
 }

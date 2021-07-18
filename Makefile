@@ -20,7 +20,7 @@ test_infeasible: main
 	./bin/main ./tests/test_LPs/input/vanderbei_exercise2.7.txt
 
 test_hard: main
-	./bin/main ./tests/test_LPs/input/netlib_adlittle.txt
+	./bin/main ./tests/test_LPs/input/netlib_klein2.txt
 test_medium: main
 	./bin/main ./tests/test_LPs/input/netlib_afiro.txt
 test_loop: main

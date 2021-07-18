@@ -37,6 +37,9 @@ private:
   VectorXd deltaX(size_t entering_index);
   VectorXd deltaZ(size_t leaving_index);
 
+  VectorXd solveA_B_transpose_x_equals_b(VectorXd const& b) const;
+  VectorXd solveA_B_x_equals_b(VectorXd const& b) const;
+
   double primalObjectiveValue() const;
   double dualObjectiveValue(VectorXd const& obj_coeff_vector) const;
   void printOptimalVariableAssignment() const;
@@ -44,7 +47,8 @@ private:
   HighestIncreaseResult calcHighestIncrease(unsigned int entering_index);
   HighestIncreaseResult calcHighestIncrease_Dual(VectorXd const& delta_z);
 
-  size_t chooseEnteringVariable() const;
+  size_t chooseEnteringVariable_blandsRule() const;
+  size_t chooseEnteringVariable_bland() const;
   size_t chooseDualLeavingVariable_largestCoeff() const;
   size_t chooseDualLeavingVariable_blandsRule() const;
   void findInitialFeasibleDictionary();
@@ -56,6 +60,15 @@ private:
   LPResult primalSolve();
   LPResult dualSolve(Eigen::VectorXd const& obj_coeff_vector);
 
+  /*--------------------------------------------------
+   * mutable because these are basically used for caching
+   * inverse operations and therefore need to be used in const methods*
+   *.................................................. */
+  mutable bool isDecompStale;
+  mutable Eigen::FullPivLU<Eigen::MatrixXd> A_B_decomp;
+  mutable Eigen::FullPivLU<Eigen::MatrixXd> A_B_transpose_decomp;
+
+
   size_t num_basic_vars;
   size_t num_non_basic_vars;
   // basis is an n+m sized vector
@@ -66,5 +79,4 @@ private:
   Eigen::VectorXd z_vector;
   Eigen::VectorXd b_vector;
   Eigen::VectorXd x_vector;
-
 };

@@ -9,7 +9,7 @@
 
 //#define DEBUG
 
-const double epsilon = 1.0e-10;
+const double epsilon = 1.0e-7;
 
 VectorXd zeroifySmallValues(VectorXd vals) {
   for(double& val: vals) {
@@ -140,6 +140,7 @@ LPSolver::LPSolver(const char* filename)
   }
   /*--------------------------------------------------*/
 
+  isDecompStale = true;
   // #ifdef DEBUG
   // std::cout << "Here's the objective coefficient vector:\n" << c_vector.transpose() << std::endl;
   // std::cout << "Here's the LP matrix in equational form:\n" << equational_matrix << std::endl;
@@ -180,7 +181,7 @@ VectorXd LPSolver::c_N() const {
 
 VectorXd LPSolver::calcZ_N() const {
   // first solve (A_B)^T v = c_B
-  VectorXd v = A_B().transpose().fullPivLu().solve(c_B());
+  VectorXd v = solveA_B_transpose_x_equals_b(c_B());
 
   // then calculate z_N = A_N^T v - c_N
   return A_N().transpose() * v - c_N();
@@ -188,7 +189,7 @@ VectorXd LPSolver::calcZ_N() const {
 
 double LPSolver::primalObjectiveValue() const {
   // first solve A_B v = b
-  VectorXd v = A_B().fullPivLu().solve(b_vector);
+  VectorXd v = solveA_B_x_equals_b(b_vector);
   return c_vector(basis_indices).dot(v);
 }
 
@@ -208,6 +209,8 @@ void LPSolver::pivot(size_t entering, size_t leaving)
 
   std::sort(basis_indices.begin(), basis_indices.end(), std::less<unsigned int>());
   std::sort(non_basis_indices.begin(), non_basis_indices.end(), std::less<unsigned int>());
+
+  isDecompStale = true;
 }
 
 //bool isDualUnbounded() const {}
@@ -224,17 +227,39 @@ void LPSolver::printOptimalVariableAssignment() const {
 }
 
 double LPSolver::dualObjectiveValue(VectorXd const& obj_coeff_vector) const {
-  return obj_coeff_vector(basis_indices).dot(A_B().fullPivLu().solve(b_vector));
+  return obj_coeff_vector(basis_indices).dot(solveA_B_x_equals_b(b_vector));
 }
 
+
+// TODO make this reuse the factorization
+VectorXd LPSolver::solveA_B_transpose_x_equals_b(VectorXd const& b) const {
+  if(isDecompStale) {
+    A_B_decomp = A_B().fullPivLu();
+    isDecompStale = false;
+  }
+  return A_B_decomp.transpose().solve(b);
+}
+
+// TODO make this reuse the factorization
+VectorXd LPSolver::solveA_B_x_equals_b(VectorXd const& b) const {
+  if(isDecompStale) {
+    A_B_decomp = A_B().fullPivLu();
+    isDecompStale = false;
+  }
+
+  return A_B_decomp.solve(b);
+}
+
+
 LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) {
-  { /*-------------------------------------------------------------
+  {
+    /*-------------------------------------------------------------
      * Populate z_vector with the current values
      * (based on basis indices)
      * .............................................................*/
     z_vector(basis_indices).fill(0.0);
 
-    VectorXd v = A_B().transpose().fullPivLu().solve(obj_coeff_vector(basis_indices));
+    VectorXd v = solveA_B_transpose_x_equals_b(obj_coeff_vector(basis_indices));
     z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
     /*-------------------------------------------------------------*/
 
@@ -247,13 +272,15 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     }
   }
 
+  int pivot_count = 0;
+
   // If here, it is initially feasible, so solve it
   while(true) {
 
     /*--------------------------------------------------
      * Part 1: Compute x and check for optimality
      *.................................................. */
-    x_vector(basis_indices) = A_B().fullPivLu().solve(b_vector);
+    x_vector(basis_indices) = solveA_B_x_equals_b(b_vector);
     x_vector(non_basis_indices).fill(0.0);
 
     if(x_vector(basis_indices).minCoeff() >= -epsilon) {
@@ -273,8 +300,6 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
      * Part 3: choose entering variable
      *..................................................*/
     auto highestIncreaseResult = calcHighestIncrease_Dual(delta_z);
-    double s = highestIncreaseResult.maxIncrease;
-
     if(highestIncreaseResult.unbounded) {
       LPResult r;
       r.state = State::Unbounded;
@@ -282,18 +307,25 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
       return r;
     }
 
+    double s = highestIncreaseResult.maxIncrease;
+    size_t entering_index = highestIncreaseResult.index;
+
     /*--------------------------------------------------
      * Part 4: update for the next iteration
      *.................................................. */
     //z_vector(non_basis_indices) -= (s * delta_z(non_basis_indices));
     //z_vector(leaving_index) = s;
-    pivot(highestIncreaseResult.index, leaving_index);
+    pivot(entering_index, leaving_index);
 
     z_vector(basis_indices).fill(0.0);
-
-    VectorXd v = A_B().transpose().fullPivLu().solve(obj_coeff_vector(basis_indices));
+    VectorXd v = solveA_B_transpose_x_equals_b(obj_coeff_vector(basis_indices));
     z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
     z_vector(non_basis_indices) = zeroifySmallValues(z_vector(non_basis_indices));
+
+    pivot_count++;
+    if(pivot_count%1 == 0) {
+      std::cerr << pivot_count << " pivots" << std::endl;
+    }
   }
 }
 
@@ -350,11 +382,10 @@ LPSolver::LPResult LPSolver::primalSolve() {
 void LPSolver::solve()
 {
   // Initialize the x vector and check for initial feasibility
-  auto x_B = x_vector(basis_indices);
-  x_B = calcX_B();
-  auto x_N = x_vector(non_basis_indices);
+  x_vector(basis_indices) = calcX_B();
   /*  initialize the x values */
-  x_N.fill(0.0);
+  x_vector(non_basis_indices).fill(0.0);
+
   // any of the basic variables are negative, then we don't have a feasible dictionary
   if(!isPrimalFeasible()) {
     #ifdef DEBUG
@@ -425,7 +456,7 @@ void LPSolver::solve()
 // j is the potential entering variable index
 VectorXd LPSolver::deltaX(size_t j)  {
   VectorXd delta_x(num_basic_vars + num_non_basic_vars);
-  delta_x(basis_indices) = A_B().fullPivLu().solve(equational_matrix.col(j));
+  delta_x(basis_indices) = solveA_B_x_equals_b(equational_matrix.col(j));
   delta_x(non_basis_indices).fill(0.0);
   return delta_x;
 }
@@ -473,7 +504,7 @@ VectorXd LPSolver::deltaZ(size_t leaving_index) {
   assert(u_vector.maxCoeff() == 1.0);
 
   VectorXd delta_z(num_basic_vars + num_non_basic_vars);
-  VectorXd v = A_B().transpose().fullPivLu().solve(u_vector);
+  VectorXd v = solveA_B_transpose_x_equals_b(u_vector);
 
   delta_z(basis_indices).fill(0.0);
   delta_z(non_basis_indices) = -A_N().transpose() * v;
@@ -505,9 +536,9 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd cons
 
 // NOTE: uses Bland's Rule (lowest index index)
 size_t LPSolver::chooseEnteringVariable_blandsRule() const {
-  for(auto basis_index : non_basis_indices) {
-    if(z_vector(basis_index) < -epsilon) {
-      return basis_index;
+  for(auto non_basis_index : non_basis_indices) {
+    if(z_vector(non_basis_index) < -epsilon) {
+      return non_basis_index;
     }
   }
   assert(false);
@@ -516,17 +547,13 @@ size_t LPSolver::chooseEnteringVariable_blandsRule() const {
 
 // assumes it's not dual optimal, so there will be a leaving var
 size_t LPSolver::chooseDualLeavingVariable_blandsRule() const {
-  bool foundOne = false;
-  size_t leaving_index;
   for(auto basis_index : basis_indices) {
     if(x_vector(basis_index) < -epsilon) {
-      foundOne = true;
-      leaving_index = basis_index;
-      break;
+      return basis_index;
     }
   }
-  assert(foundOne);
-  return leaving_index;
+  assert(false);
+  return 0;
 }
 
 // assumes it's not dual optimal, so there will be a leaving var
@@ -546,15 +573,14 @@ size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
 
 bool LPSolver::isDualFeasible() {
   z_vector(basis_indices).fill(0.0);
-  VectorXd v = A_B().transpose().fullPivLu().solve(c_B());
+  VectorXd v = solveA_B_transpose_x_equals_b(c_B());
   z_vector(non_basis_indices) = (A_N().transpose() * v) - c_N();
 
   return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
 }
 
+// NOTE: assumes the x_vector is up to date
 bool LPSolver::isPrimalFeasible() const {
-  VectorXd x_B = calcX_B();
-
   // if all the X_B coefficients are non-negative, it's infeasible
-  return (x_B.minCoeff() >= -epsilon);
+  return (x_vector(basis_indices).minCoeff() >= -epsilon);
 }

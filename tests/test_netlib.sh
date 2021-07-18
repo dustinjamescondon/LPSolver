@@ -8,6 +8,7 @@ len=${#INPFILES[@]}
 
 for (( i=0; i<$len; i++))
 do
+    echo "solving ${INPFILES[$i]}"
     output=$(./bin/main ${INPFILES[$i]})
     exp_output=$(cat ${EXPFILES[$i]})
 
@@ -19,7 +20,7 @@ do
     fi
 
     if [ "$passed" = true ]; then
-        echo "passed"
+        echo -ne "\rpassed ${INPFILES[$i]}\r\n"
     else
         echo "--------------------------------------------------"
         echo "failed"

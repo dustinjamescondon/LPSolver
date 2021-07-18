@@ -34,8 +34,8 @@ private:
   MatrixXd A_N() const;
   VectorXd c_B() const;
   VectorXd c_N() const;
-  VectorXd deltaX(size_t entering_index);
-  VectorXd deltaZ(size_t leaving_index);
+  VectorXd deltaX(size_t entering_index) const;
+  VectorXd deltaZ(size_t leaving_index) const;
 
   VectorXd solveA_B_transpose_x_equals_b(VectorXd const& b) const;
   VectorXd solveA_B_x_equals_b(VectorXd const& b) const;
@@ -44,11 +44,10 @@ private:
   double dualObjectiveValue(VectorXd const& obj_coeff_vector) const;
   void printOptimalVariableAssignment() const;
 
-  HighestIncreaseResult calcHighestIncrease(VectorXd const& delta_x);
-  HighestIncreaseResult calcHighestIncrease_Dual(VectorXd const& delta_z);
+  HighestIncreaseResult calcHighestIncrease(VectorXd const& delta_x) const;
+  HighestIncreaseResult calcHighestIncrease_Dual(VectorXd const& delta_z) const;
 
-  size_t chooseEnteringVariable_blandsRule() const;
-  size_t chooseEnteringVariable_bland() const;
+  size_t choosePrimalEnteringVariable_blandsRule() const;
   size_t chooseDualLeavingVariable_largestCoeff() const;
   size_t chooseDualLeavingVariable_blandsRule() const;
   void findInitialFeasibleDictionary();

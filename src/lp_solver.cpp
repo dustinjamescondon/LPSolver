@@ -9,7 +9,7 @@
 
 //#define DEBUG
 
-const double epsilon = 1.0e-7;
+const double epsilon = 1.0e-10;
 
 // if a value is smaller than epsilon, then set it to zero
 VectorXd zeroify(VectorXd vals) {
@@ -313,7 +313,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
         }
       }
     }
-    printf("entering %i    leaving %i\n", entering_index, leaving_index);
+    //printf("entering %i    leaving %i\n", entering_index, leaving_index);
 
     /*--------------------------------------------------
      * Part 4: update for the next iteration
@@ -345,7 +345,7 @@ LPSolver::LPResult LPSolver::primalSolve() {
     }
 
     // Part 2: choose entering variable
-    auto entering_index = chooseEnteringVariable_blandsRule();
+    auto entering_index = choosePrimalEnteringVariable_blandsRule();
 
     // Part 3: choose leaving variable
     VectorXd delta_x = deltaX(entering_index);
@@ -369,7 +369,7 @@ LPSolver::LPResult LPSolver::primalSolve() {
       }
     }
 
-    printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
+    //printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
 
     // Part 4: update for next iteration
     pivot(entering_index, leaving_index);
@@ -453,14 +453,14 @@ void LPSolver::solve()
 
 
 // j is the potential entering variable index
-VectorXd LPSolver::deltaX(size_t j)  {
+VectorXd LPSolver::deltaX(size_t j) const {
   VectorXd delta_x(num_basic_vars + num_non_basic_vars);
   delta_x(basis_indices) = solveA_B_x_equals_b(equational_matrix.col(j));
   delta_x(non_basis_indices).fill(0.0);
   return delta_x;
 }
 
-LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& delta_x)  {
+LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& delta_x) const {
   HighestIncreaseResult result;
 
   result.unbounded = true; // if we don't find a valid delta_x index, then it's unbounded
@@ -479,7 +479,7 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& de
   return result;
 }
 
-VectorXd LPSolver::deltaZ(size_t leaving_index) {
+VectorXd LPSolver::deltaZ(size_t leaving_index) const {
 
   VectorXd u_vector(basis_indices.size());
   for(size_t k = 0; k < u_vector.size(); ++k) {
@@ -498,7 +498,7 @@ VectorXd LPSolver::deltaZ(size_t leaving_index) {
   return delta_z;
 }
 
-LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd const& delta_z) {
+LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd const& delta_z) const {
   HighestIncreaseResult result;
 
   result.maxIncrease = std::numeric_limits<double>::max();
@@ -517,14 +517,14 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd cons
 }
 
 // NOTE: uses Bland's Rule (lowest index index)
-size_t LPSolver::chooseEnteringVariable_blandsRule() const {
+size_t LPSolver::choosePrimalEnteringVariable_blandsRule() const {
   for(auto non_basis_index : non_basis_indices) {
     if(z_vector(non_basis_index) < -epsilon) {
       return non_basis_index;
     }
   }
   assert(false);
-  return 0; // shouldn't get here TODO deal with this in a better way
+  return 0; // shouldn't get here
 }
 
 // assumes it's not dual optimal, so there will be a leaving var
@@ -535,7 +535,7 @@ size_t LPSolver::chooseDualLeavingVariable_blandsRule() const {
     }
   }
   assert(false);
-  return 0;
+  return 0; // shouldn't get here
 }
 
 // assumes it's not dual optimal, so there will be a leaving var

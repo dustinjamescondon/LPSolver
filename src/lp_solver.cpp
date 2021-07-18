@@ -7,7 +7,7 @@
 #include <limits>
 #include <cmath>
 
-#define DEBUG
+//#define DEBUG
 
 const double epsilon = 1.0e-10;
 
@@ -369,7 +369,7 @@ LPSolver::LPResult LPSolver::primalSolve() {
       }
     }
 
-    printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
+    //printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
 
     // Part 4: update for next iteration
     pivot(entering_index, leaving_index);
@@ -469,8 +469,8 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& de
   result.unbounded = true; // if we don't find a valid delta_x index, then it's unbounded
   result.maxIncrease = std::numeric_limits<double>::max();
   for(auto basis_index : basis_indices) {
-    if(delta_x[basis_index] > epsilon) {
-      double fraction = x_vector[basis_index] / delta_x[basis_index];
+    if(delta_x(basis_index) > epsilon) {
+      double fraction = x_vector(basis_index) / delta_x(basis_index);
 
       if(fraction < result.maxIncrease) {
         result.maxIncrease = fraction;

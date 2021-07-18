@@ -7,7 +7,7 @@
 #include <limits>
 #include <cmath>
 
-//#define DEBUG
+#define DEBUG
 
 const double epsilon = 1.0e-10;
 
@@ -303,7 +303,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     }
 
     double s = highestIncreaseResult.maxIncrease;
-    size_t entering_index = 1234567;//highestIncreaseResult.index;
+    size_t entering_index = 1234567; // something that will fail if not overwritten
 
     for(size_t non_basis_index : non_basis_indices) {
       if(delta_z(non_basis_index) > epsilon) {
@@ -357,7 +357,7 @@ LPSolver::LPResult LPSolver::primalSolve() {
       return r;
     }
 
-    size_t leaving_index = 1234567; //highestIncreaseResult.index;
+    size_t leaving_index = 1234567; // something that will fail if not overwritten
     double t = highestIncreaseResult.maxIncrease;
 
     for(size_t basis_index : basis_indices) {
@@ -369,7 +369,7 @@ LPSolver::LPResult LPSolver::primalSolve() {
       }
     }
 
-    //printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
+    printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
 
     // Part 4: update for next iteration
     pivot(entering_index, leaving_index);
@@ -442,6 +442,9 @@ void LPSolver::solve()
       return;
     }
   }
+  #ifdef DEBUG
+  std::cout << "it's intially feasible!\n";
+  #endif
   auto result = primalSolve();
   if(result.state == State::Unbounded) {
     std::cout << "unbounded";
@@ -543,7 +546,7 @@ size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
   double max = 0.0;
   size_t max_index = 0;
   for(auto basis_index : basis_indices) {
-    if(x_vector(basis_index) < 0.0) {
+    if(x_vector(basis_index) < -epsilon) {
       if(-x_vector(basis_index) > max) {
         max = -x_vector(basis_index);
         max_index = basis_index;

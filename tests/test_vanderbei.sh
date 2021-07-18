@@ -8,7 +8,7 @@ len=${#INPFILES[@]}
 
 for (( i=0; i<$len; i++))
 do
-    output=$(./bin/main ${INPFILES[$i]})
+    output=$(./bin/main < ${INPFILES[$i]})
     exp_output=$(cat ${EXPFILES[$i]})
 
     passed=false

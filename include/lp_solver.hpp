@@ -8,8 +8,7 @@ using namespace Eigen;
 class LPSolver
 {
 public:
-  LPSolver(const char* filename);
-  LPSolver() {}
+  LPSolver();
 
   void solve();
   void pivot(size_t entering, size_t leaving);

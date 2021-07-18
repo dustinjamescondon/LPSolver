@@ -12,19 +12,19 @@ bin/lp_solver.o: include/lp_solver.hpp src/lp_solver.cpp
 	g++ $(INC) $(DEBUG) -c src/lp_solver.cpp -o bin/lp_solver.o
 
 tests: main
-	./bin/main ./tests/simple_initially_feasible.txt
-	./bin/main ./tests/simple_initially_infeasible.txt
-	./bin/main ./tests/simple_dual_feasible.txt
+	./bin/main < ./tests/simple_initially_feasible.txt
+	./bin/main < ./tests/simple_initially_infeasible.txt
+	./bin/main < ./tests/simple_dual_feasible.txt
 
 test_infeasible: main
-	./bin/main ./tests/test_LPs/input/vanderbei_exercise2.7.txt
+	./bin/main < ./tests/test_LPs/input/vanderbei_exercise2.7.txt
 
 test_hard: main
-	./bin/main ./tests/test_LPs/input/netlib_share1b.txt
+	./bin/main < ./tests/test_LPs/input/netlib_share1b.txt
 test_medium: main
-	./bin/main ./tests/test_LPs/input/netlib_afiro.txt
+	./bin/main < ./tests/test_LPs/input/netlib_afiro.txt
 test_loop: main
-	./bin/main ./tests/test_LPs/input/netlib_klein1.txt
+	./bin/main < ./tests/test_LPs/input/netlib_klein1.txt
 test_all: main
 	./tests/test_vanderbei.sh
 	./tests/test_netlib.sh

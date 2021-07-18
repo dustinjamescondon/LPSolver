@@ -41,33 +41,24 @@ void LPSolver::updateZ(VectorXd const& obj_coeff_vector) {
     z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
 }
 
-LPSolver::LPSolver(const char* filename)
+LPSolver::LPSolver()
 {
-  std::ifstream t(filename, std::ifstream::in);
-  if (!t.is_open()) {
-    std::cout<< "Couldn't open " << filename << std::endl;
-    exit(1);
-  }
-  std::stringstream streamified_text;
-  streamified_text << t.rdbuf();
-
   vector<string> lines;
-
   /*--------------------------------------------------
    * Parse the lines
    ..................................................*/
   {
-    string line;
+    string input_line;
 
-    while(getline(streamified_text, line, '\n')){
+    while(getline(cin, input_line)){
       /*--------------------------------------------------
         replace any tabs with spaces so we only have to
         deal with one type of delimiter
        .................................................. */
-      for(char & c : line)
+      for(char & c : input_line)
         if(c == '\t') c = ' ';
       /*--------------------------------------------------*/
-      lines.push_back(line);
+      lines.push_back(input_line);
     }
   }
   /*-------------------------------------------------

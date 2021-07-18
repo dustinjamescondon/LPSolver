@@ -8,7 +8,7 @@
 #include <cmath>
 
 //#define DEBUG
-
+using namespace std;
 const double epsilon = 1.0e-9;
 
 // if a value is smaller than epsilon, then set it to zero
@@ -27,7 +27,6 @@ void zeroify(double& val) {
     val = 0.0;
 }
 
-using namespace std;
 
 void LPSolver::updateX() {
   x_vector(basis_indices) = solveA_B_x_equals_b(b_vector);
@@ -349,7 +348,7 @@ LPSolver::LPResult LPSolver::primalSolve() {
 
     // Part 3: choose leaving variable
     VectorXd delta_x = deltaX(entering_index);
-    auto highestIncreaseResult = calcHighestIncrease(delta_x);
+    auto highestIncreaseResult = calcHighestIncrease_Primal(delta_x);
 
     if(highestIncreaseResult.unbounded) {
       LPResult r;
@@ -360,6 +359,8 @@ LPSolver::LPResult LPSolver::primalSolve() {
     size_t leaving_index = 1234567; // something that will fail if not overwritten
     double t = highestIncreaseResult.maxIncrease;
 
+    // This selects the leaving index using Bland's Rule by finding the lowest
+    // indexed variable such that x(j)/deltax(j) = t
     for(size_t basis_index : basis_indices) {
       if(delta_x(basis_index) >= epsilon) {
         if(std::abs((x_vector(basis_index)/delta_x(basis_index)) - t) <= epsilon) {
@@ -398,17 +399,22 @@ void LPSolver::solve()
       #endif
       // then solve the dual LP
       auto result = dualSolve(c_vector);
+
+      // If the dual is unbounded, that means the primal is infeasible
       if(result.state == State::Unbounded) {
         std::cout << "infeasible";
         return;
       }
+      // otherwise, if its optimal, that means the optimal value is equal
+      // to that of the primal
       else {
         printf("optimal\n%.7g\n", result.optimal_val);
         printOptimalVariableAssignment();
         return;
       }
     }
-    // Otherwise, if it isn't dual-feasible
+    // Otherwise, if the original LP isn't dual-feasible, then we have to
+    // deal with the auxilary problem to try and find a feasible basis
     else {
       #ifdef DEBUG
       std::cout << "And it isn't intially dual-feasible either...\n";
@@ -422,6 +428,9 @@ void LPSolver::solve()
         #ifdef DEBUG
         std::cout << "Found the optimal of the aux\n";
         #endif
+
+        // if we found an optimal basis for the auxilary dual, then we can use it
+        // to start off the primal in a feasible basis too
         auto result = primalSolve();
         if(result.state == State::Unbounded) {
           std::cout <<"unbounded\n";
@@ -432,21 +441,21 @@ void LPSolver::solve()
           return;
         }
       }
-      else if(auxResult.state == State::Unbounded) {
+      // Now if the aux dual is unbounded then the primal is infeasible
+      else {
 #ifdef DEBUG
         std::cout << "Oh dear, the aux is unbounded..." << std::endl;
 #endif
         std::cout << "infeasible\n";
       }
-      else {// if(auxResult.state == State::Unbounded)
-        std::cout << "infeasible\n";
-      }
       return;
     }
   }
-  #ifdef DEBUG
+
+  // if we're here, then the primal IS intially feasible, so just call primalSolve
+#ifdef DEBUG
   std::cout << "it's intially feasible!\n";
-  #endif
+#endif
   auto result = primalSolve();
   if(result.state == State::Unbounded) {
     std::cout << "unbounded";
@@ -465,7 +474,9 @@ VectorXd LPSolver::deltaX(size_t j) const {
   return delta_x;
 }
 
-LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& delta_x) const {
+/* Determine the most we can increase the entering variable by while maintaining the non
+  negativity constraint in the primal solver*/
+LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Primal(VectorXd const& delta_x) const {
   HighestIncreaseResult result;
 
   result.unbounded = true; // if we don't find a valid delta_x index, then it's unbounded
@@ -483,6 +494,7 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& de
 
   return result;
 }
+
 
 VectorXd LPSolver::deltaZ(size_t leaving_index) const {
 
@@ -503,6 +515,8 @@ VectorXd LPSolver::deltaZ(size_t leaving_index) const {
   return delta_z;
 }
 
+/* Determine the maximum amount we can increase the leaving entering variable by in the dual
+  solver while maintaining the non-negativity constraint */
 LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd const& delta_z) const {
   HighestIncreaseResult result;
 
@@ -544,6 +558,7 @@ size_t LPSolver::chooseDualLeavingVariable_blandsRule() const {
 }
 
 // assumes it's not dual optimal, so there will be a leaving var
+// NOTE: this isn't called in the solver
 size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
   double max = 0.0;
   size_t max_index = 0;
@@ -558,20 +573,26 @@ size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
   return max_index;
 }
 
+/* Determine if the current basis is dual-feasible by making sure none of the z_N values are
+  negative */
 bool LPSolver::isDualFeasible() const {
   return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
 }
 
-// NOTE: assumes the x_vector is up to date
+/* Determine if the current basis is primal-feasible by making sure none of the x_B values are
+  negative */
 bool LPSolver::isPrimalFeasible() const {
-  // if all the X_B coefficients are non-negative, it's infeasible
   return (x_vector(basis_indices).minCoeff() >= -epsilon);
 }
 
+/* Determine if the current basis is primal-optimal by making checking if the z_N
+  values are non-negative (and within epsilon of zero) */
 bool LPSolver::isPrimalOptimal() const {
   return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
 }
 
+/* Determine if the current basis is dual-optimal by making checking if the x_B
+  values are non-negative (and within epsilon of zero) */
 bool LPSolver::isDualOptimal() const {
   return (x_vector(basis_indices).minCoeff() >= -epsilon);
 }

@@ -11,6 +11,8 @@ This LP solver is an implementation of the Revised Simplex Method. An equational
 
 In order to avoid cycling, the pivot selection rule for all pivots is Blands Rule, for both the primal and dual simplex algorithms.
 
+For all the linear algebra functionality, I used the C++ header library Eigen.
+
 * Features
 There are two main features implemented:
 1. The Primal-Dual method is used to deal with initially infeasible LPS

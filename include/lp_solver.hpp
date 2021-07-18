@@ -11,7 +11,6 @@ public:
   LPSolver();
 
   void solve();
-  void pivot(size_t entering, size_t leaving);
 
 private:
   enum  class State { Optimal, Unbounded, Infeasible };
@@ -25,6 +24,8 @@ private:
     double optimal_val;
     State state;
   };
+
+  void pivot(size_t entering, size_t leaving);
   void updateX();
   void updateZ(VectorXd const& obj_coeff_vector);
   void updateSubmatrices() const; // const because mutable
@@ -43,7 +44,7 @@ private:
   double dualObjectiveValue(VectorXd const& obj_coeff_vector) const;
   void printOptimalVariableAssignment() const;
 
-  HighestIncreaseResult calcHighestIncrease(VectorXd const& delta_x) const;
+  HighestIncreaseResult calcHighestIncrease_Primal(VectorXd const& delta_x) const;
   HighestIncreaseResult calcHighestIncrease_Dual(VectorXd const& delta_z) const;
 
   size_t choosePrimalEnteringVariable_blandsRule() const;

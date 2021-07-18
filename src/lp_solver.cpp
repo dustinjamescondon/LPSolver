@@ -22,6 +22,18 @@ VectorXd zeroifySmallValues(VectorXd vals) {
 
 using namespace std;
 
+void LPSolver::updateX() {
+  x_vector(basis_indices) = solveA_B_x_equals_b(b_vector);
+  x_vector(non_basis_indices).fill(0.0);
+}
+
+void LPSolver::updateZ(VectorXd const& obj_coeff_vector) {
+    z_vector(basis_indices).fill(0.0);
+
+    VectorXd v = solveA_B_transpose_x_equals_b(obj_coeff_vector(basis_indices));
+    z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
+}
+
 LPSolver::LPSolver(const char* filename)
 {
   std::ifstream t(filename, std::ifstream::in);
@@ -175,11 +187,6 @@ MatrixXd LPSolver::A_N() const
   return A_N_cached;
 }
 
-VectorXd LPSolver::calcX_B() const
-{
-  return A_B().fullPivLu().solve(b_vector);
-}
-
 VectorXd LPSolver::c_B() const {
   return c_vector(basis_indices);
 }
@@ -188,13 +195,6 @@ VectorXd LPSolver::c_N() const {
   return c_vector(non_basis_indices);
 }
 
-VectorXd LPSolver::calcZ_N() const {
-  // first solve (A_B)^T v = c_B
-  VectorXd v = solveA_B_transpose_x_equals_b(c_B());
-
-  // then calculate z_N = A_N^T v - c_N
-  return A_N().transpose() * v - c_N();
-}
 
 double LPSolver::primalObjectiveValue() const {
   // first solve A_B v = b
@@ -263,41 +263,27 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
   {
     /*-------------------------------------------------------------
      * Populate z_vector with the current values
-     * (based on basis indices)
      * .............................................................*/
-    z_vector(basis_indices).fill(0.0);
-
-    VectorXd v = solveA_B_transpose_x_equals_b(obj_coeff_vector(basis_indices));
-    z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
+    updateX();
+    updateZ(obj_coeff_vector);
     /*-------------------------------------------------------------*/
 
     // check for initial feasibility
-    if(z_vector(non_basis_indices).minCoeff() < -epsilon) {
-      // infeasible
+    if(!isDualFeasible()) {
       LPResult r;
       r.state = State::Infeasible;
       return r;
     }
   }
 
-  int pivot_count = 0;
-
   // If here, it is initially feasible, so solve it
   while(true) {
 
     /*--------------------------------------------------
-     * Part 1: Compute x and check for optimality
-     *.................................................. */
-    x_vector(basis_indices) = solveA_B_x_equals_b(b_vector);
-    x_vector(non_basis_indices).fill(0.0);
-    x_vector(basis_indices) = zeroifySmallValues(x_vector(basis_indices));
-
-    if(x_vector(basis_indices).minCoeff() >= -epsilon) {
-      LPResult r;
-      r.optimal_val = dualObjectiveValue(obj_coeff_vector);
-      r.state = State::Optimal;
-
-      return r;
+     * Part 1: Check for optimality
+     *..................................................*/
+    if(isDualOptimal()) {
+      LPResult r; r.optimal_val = dualObjectiveValue(obj_coeff_vector); r.state = State::Optimal; return r;
     }
 
     /*--------------------------------------------------
@@ -305,15 +291,13 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
      *..................................................*/
     size_t leaving_index = chooseDualLeavingVariable_blandsRule();
     VectorXd delta_z = zeroifySmallValues(deltaZ(leaving_index));
+
     /*-------------------------------------------------
      * Part 3: choose entering variable
      *..................................................*/
     auto highestIncreaseResult = calcHighestIncrease_Dual(delta_z);
     if(highestIncreaseResult.unbounded) {
-      LPResult r;
-      r.state = State::Unbounded;
-
-      return r;
+      LPResult r; r.state = State::Unbounded; return r;
     }
 
     double s = highestIncreaseResult.maxIncrease;
@@ -322,21 +306,17 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     /*--------------------------------------------------
      * Part 4: update for the next iteration
      *.................................................. */
-    z_vector(non_basis_indices) -= (s * delta_z(non_basis_indices));
-    z_vector(leaving_index) = s;
     pivot(entering_index, leaving_index);
 
-    // pivot_count++;
-    // if(pivot_count%1 == 0) {
-    //   std::cerr << pivot_count << " pivots" << std::endl;
-    //}
+    updateX();
+    updateZ(obj_coeff_vector);
   }
 }
 
 LPSolver::LPResult LPSolver::primalSolve() {
 // Initialize the x vector and check for initial feasibility
-  x_vector(basis_indices) = calcX_B();
-  x_vector(non_basis_indices).fill(0.0);
+  updateX();
+  updateZ(c_vector);
 
   if(!isPrimalFeasible()) {
     LPResult r;
@@ -346,24 +326,18 @@ LPSolver::LPResult LPSolver::primalSolve() {
 
   // If here, we have an initially feasible dictionary, so solve the LP
   while(true) {
-    // Update the z vector
-    z_vector(basis_indices).fill(0.0);
-    z_vector(non_basis_indices) = calcZ_N();
-
     // If every element of Z is non-negative,
     //   then this is the optimal dictionary
-    if(z_vector(non_basis_indices).minCoeff() >= -epsilon) {
-      LPResult r;
-      r.optimal_val = primalObjectiveValue();
-      r.state = State::Optimal;
-      return r;
+    if(isPrimalOptimal()) {
+      LPResult r; r.optimal_val = primalObjectiveValue(); r.state = State::Optimal; return r;
     }
 
-    // Part 2: choose entering variable (Bland's Rule for now)
+    // Part 2: choose entering variable
     auto entering_index = chooseEnteringVariable_blandsRule();
 
     // Part 3: choose leaving variable
-    auto highestIncreaseResult = calcHighestIncrease(entering_index);
+    VectorXd delta_x = deltaX(entering_index);
+    auto highestIncreaseResult = calcHighestIncrease(delta_x);
     size_t leaving_index = highestIncreaseResult.index;
     double t = highestIncreaseResult.maxIncrease;
     if(highestIncreaseResult.unbounded) {
@@ -373,22 +347,18 @@ LPSolver::LPResult LPSolver::primalSolve() {
     }
 
     // Part 4: update for next iteration
-    //x_B -= (deltaX(entering_index)(basis_indices)) * t;
-    //x_vector(entering_index) = t;
     pivot(entering_index, leaving_index);
 
-    x_vector(basis_indices) = calcX_B();
-    x_vector(non_basis_indices).fill(0.0);
+    updateX();
+    updateZ(c_vector);
   }
 }
 
 
 void LPSolver::solve()
 {
-  // Initialize the x vector and check for initial feasibility
-  x_vector(basis_indices) = calcX_B();
-  /*  initialize the x values */
-  x_vector(non_basis_indices).fill(0.0);
+  updateX();
+  updateZ(c_vector);
 
   // any of the basic variables are negative, then we don't have a feasible dictionary
   if(!isPrimalFeasible()) {
@@ -465,9 +435,8 @@ VectorXd LPSolver::deltaX(size_t j)  {
   return delta_x;
 }
 
-LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(unsigned entering_index)  {
+LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& delta_x)  {
   HighestIncreaseResult result;
-  VectorXd delta_x = deltaX(entering_index);
 
   result.unbounded = true; // if we don't find a valid delta_x index, then it's unbounded
   result.maxIncrease = std::numeric_limits<double>::max();
@@ -575,16 +544,20 @@ size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
   return max_index;
 }
 
-bool LPSolver::isDualFeasible() {
-  z_vector(basis_indices).fill(0.0);
-  VectorXd v = solveA_B_transpose_x_equals_b(c_B());
-  z_vector(non_basis_indices) = (A_N().transpose() * v) - c_N();
-
+bool LPSolver::isDualFeasible() const {
   return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
 }
 
 // NOTE: assumes the x_vector is up to date
 bool LPSolver::isPrimalFeasible() const {
   // if all the X_B coefficients are non-negative, it's infeasible
+  return (x_vector(basis_indices).minCoeff() >= -epsilon);
+}
+
+bool LPSolver::isPrimalOptimal() const {
+  return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
+}
+
+bool LPSolver::isDualOptimal() const {
   return (x_vector(basis_indices).minCoeff() >= -epsilon);
 }

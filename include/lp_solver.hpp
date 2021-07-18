@@ -27,11 +27,12 @@ private:
     double optimal_val;
     State state;
   };
+  void updateX();
+  void updateZ(VectorXd const& obj_coeff_vector);
+  void updateSubmatrices() const; // const because mutable
 
   MatrixXd A_B() const;
   MatrixXd A_N() const;
-  VectorXd calcX_B() const;
-  VectorXd calcZ_N() const;
   VectorXd c_B() const;
   VectorXd c_N() const;
   VectorXd deltaX(size_t entering_index);
@@ -44,7 +45,7 @@ private:
   double dualObjectiveValue(VectorXd const& obj_coeff_vector) const;
   void printOptimalVariableAssignment() const;
 
-  HighestIncreaseResult calcHighestIncrease(unsigned int entering_index);
+  HighestIncreaseResult calcHighestIncrease(VectorXd const& delta_x);
   HighestIncreaseResult calcHighestIncrease_Dual(VectorXd const& delta_z);
 
   size_t chooseEnteringVariable_blandsRule() const;
@@ -54,13 +55,13 @@ private:
   void findInitialFeasibleDictionary();
 
   bool isPrimalFeasible() const;
-  bool isDualFeasible();
-  bool isOptimal();
+  bool isDualFeasible() const;
+
+  bool isPrimalOptimal() const;
+  bool isDualOptimal() const;
 
   LPResult primalSolve();
   LPResult dualSolve(Eigen::VectorXd const& obj_coeff_vector);
-
-  void updateSubmatrices() const;
 
   /*--------------------------------------------------
    * mutable because these are basically used for caching

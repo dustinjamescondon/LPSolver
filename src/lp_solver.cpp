@@ -9,7 +9,7 @@
 
 //#define DEBUG
 
-const double epsilon = 1.0e-7;
+const double epsilon = 1.0e-10;
 
 VectorXd zeroifySmallValues(VectorXd vals) {
   for(double& val: vals) {
@@ -282,6 +282,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
      *.................................................. */
     x_vector(basis_indices) = solveA_B_x_equals_b(b_vector);
     x_vector(non_basis_indices).fill(0.0);
+    x_vector(basis_indices) = zeroifySmallValues(x_vector(basis_indices));
 
     if(x_vector(basis_indices).minCoeff() >= -epsilon) {
       LPResult r;
@@ -295,7 +296,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
      * Part 2: Choose leaving variable
      *..................................................*/
     size_t leaving_index = chooseDualLeavingVariable_blandsRule();
-    VectorXd delta_z = deltaZ(leaving_index);
+    VectorXd delta_z = zeroifySmallValues(deltaZ(leaving_index));
     /*-------------------------------------------------
      * Part 3: choose entering variable
      *..................................................*/
@@ -322,10 +323,10 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     z_vector(non_basis_indices) = (A_N().transpose() * v) - obj_coeff_vector(non_basis_indices);
     z_vector(non_basis_indices) = zeroifySmallValues(z_vector(non_basis_indices));
 
-    pivot_count++;
-    if(pivot_count%1 == 0) {
-      std::cerr << pivot_count << " pivots" << std::endl;
-    }
+    // pivot_count++;
+    // if(pivot_count%1 == 0) {
+    //   std::cerr << pivot_count << " pivots" << std::endl;
+    //}
   }
 }
 

@@ -19,7 +19,6 @@ private:
 
   struct HighestIncreaseResult {
     bool unbounded;
-    size_t index;
     double maxIncrease;
   };
 

@@ -11,7 +11,8 @@
 
 const double epsilon = 1.0e-7;
 
-VectorXd zeroifySmallValues(VectorXd vals) {
+// if a value is smaller than epsilon, then set it to zero
+VectorXd zeroify(VectorXd vals) {
   for(double& val: vals) {
     if(std::abs(val) < epsilon)
       val = 0.0;
@@ -223,14 +224,15 @@ void LPSolver::pivot(size_t entering, size_t leaving)
   areSubmatricesStale = true;
 }
 
-//bool isDualUnbounded() const {}
-
 // Assumes there's at least one variable
 void LPSolver::printOptimalVariableAssignment() const {
-  // print the first component without a leading space
-  printf("%.7g", x_vector(0));
+  // if values are very small, just round them to zero for displaying
+  auto zeroified_x_vector = zeroify(x_vector);
 
-  for(double val : x_vector.segment(1, num_non_basic_vars - 1)) {
+  // print the first component without a leading space
+  printf("%.7g", zeroified_x_vector(0));
+
+  for(double val : zeroified_x_vector.segment(1, num_non_basic_vars - 1)) {
     printf(" %.7g", val);
   }
   printf("\n");
@@ -290,7 +292,7 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
      * Part 2: Choose leaving variable
      *..................................................*/
     size_t leaving_index = chooseDualLeavingVariable_blandsRule();
-    VectorXd delta_z = zeroifySmallValues(deltaZ(leaving_index));
+    VectorXd delta_z = deltaZ(leaving_index);
 
     /*-------------------------------------------------
      * Part 3: choose entering variable
@@ -301,7 +303,17 @@ LPSolver::LPResult LPSolver::dualSolve(Eigen::VectorXd const& obj_coeff_vector) 
     }
 
     double s = highestIncreaseResult.maxIncrease;
-    size_t entering_index = highestIncreaseResult.index;
+    size_t entering_index = 1234567;//highestIncreaseResult.index;
+
+    for(size_t non_basis_index : non_basis_indices) {
+      if(delta_z(non_basis_index) > epsilon) {
+        if(std::abs((z_vector(non_basis_index) / delta_z(non_basis_index)) - s) < epsilon) {
+          entering_index = non_basis_index;
+          break;
+        }
+      }
+    }
+    printf("entering %i    leaving %i\n", entering_index, leaving_index);
 
     /*--------------------------------------------------
      * Part 4: update for the next iteration
@@ -338,13 +350,26 @@ LPSolver::LPResult LPSolver::primalSolve() {
     // Part 3: choose leaving variable
     VectorXd delta_x = deltaX(entering_index);
     auto highestIncreaseResult = calcHighestIncrease(delta_x);
-    size_t leaving_index = highestIncreaseResult.index;
-    double t = highestIncreaseResult.maxIncrease;
+
     if(highestIncreaseResult.unbounded) {
       LPResult r;
       r.state = State::Unbounded;
       return r;
     }
+
+    size_t leaving_index = 1234567; //highestIncreaseResult.index;
+    double t = highestIncreaseResult.maxIncrease;
+
+    for(size_t basis_index : basis_indices) {
+      if(delta_x(basis_index) > epsilon) {
+        if(std::abs((x_vector(basis_index)/delta_x(basis_index)) - t) < epsilon) {
+          leaving_index = basis_index;
+          break;
+        }
+      }
+    }
+
+    printf("primal: entering: %i   leaving %i\n", entering_index, leaving_index);
 
     // Part 4: update for next iteration
     pivot(entering_index, leaving_index);
@@ -446,21 +471,9 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease(VectorXd const& de
 
       if(fraction < result.maxIncrease) {
         result.maxIncrease = fraction;
-        result.index = basis_index;
         result.unbounded = false;
       }
     }
-  }
-
-  if(!result.unbounded)  {
-#ifdef DEBUG
-    std::cout << "In 'calcHighestIncrease()'; highest increase is: " << result.maxIncrease << std::endl;
-#endif
-  } else {
-    #ifdef DEBUG
-    std::cout << "In 'calcHighestIncrease()'; unbounded\n";
-    #endif
-
   }
 
   return result;
@@ -496,13 +509,9 @@ LPSolver::HighestIncreaseResult LPSolver::calcHighestIncrease_Dual(VectorXd cons
       double fraction = z_vector(non_basis_index) / delta_z(non_basis_index);
       if(fraction < result.maxIncrease) {
          result.maxIncrease = fraction;
-         result.index = non_basis_index;
       }
     }
   }
-#ifdef DEBUG
-  printf("In calcHighestIncrease_Dual: it is : %.10g\n", result.maxIncrease);
-#endif
 
   return result;
 }
@@ -545,19 +554,19 @@ size_t LPSolver::chooseDualLeavingVariable_largestCoeff() const {
 }
 
 bool LPSolver::isDualFeasible() const {
-  return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
+  return (z_vector(non_basis_indices).minCoeff() > -epsilon);
 }
 
 // NOTE: assumes the x_vector is up to date
 bool LPSolver::isPrimalFeasible() const {
   // if all the X_B coefficients are non-negative, it's infeasible
-  return (x_vector(basis_indices).minCoeff() >= -epsilon);
+  return (x_vector(basis_indices).minCoeff() > -epsilon);
 }
 
 bool LPSolver::isPrimalOptimal() const {
-  return (z_vector(non_basis_indices).minCoeff() >= -epsilon);
+  return (z_vector(non_basis_indices).minCoeff() > -epsilon);
 }
 
 bool LPSolver::isDualOptimal() const {
-  return (x_vector(basis_indices).minCoeff() >= -epsilon);
+  return (x_vector(basis_indices).minCoeff() > -epsilon);
 }

@@ -9,6 +9,8 @@ Change directory to the same directory as Makefile (same directory as this REAMD
 * Solver implementation
 This LP solver is an implementation of the Revised Simplex Method. An equational matrix is built according to the input LP, along with the equational vectors for x, z, b, and c. The LP is first checked for intial feasibility; if it is not initially feasible, an auxilary LP is solved using the revised dual simplex algorithm (which uses a zero vector in place of the c vector). If an optimal solution can be found for this auxilary problem, then basis is used to begin the primal simplex algorithm; on the other hand, if the auxilary LP is unbounded, then the original LP is found to be infeasible.
 
+The linears systems are solved useing a QR decomposition of the A_B matrix, instead of directly computing an inverse.
+
 In order to avoid cycling, the pivot selection rule for all pivots is Blands Rule, for both the primal and dual simplex algorithms.
 
 For all the linear algebra functionality, I used the C++ header library Eigen.
@@ -16,7 +18,8 @@ For all the linear algebra functionality, I used the C++ header library Eigen.
 * Features
 There are two main features implemented:
 1. The Primal-Dual method is used to deal with initially infeasible LPS
-2. The Revised Simplex method is implemented instead of the dictionary method.
+2. The Revised Simplex method is implemented instead of the dictionary method
+   a. This includes using a matrix decomposition to solve the linear system
 
 * Notes
 For some confounding numerical reason, even though the solver uses Bland's Rule for every pivot decision, there are some large LP's on which it cycles. I for the life of me could not figure out how to avoid it. In particular it cycles on netlib_klein.txt, and one or two others from netlib.

@@ -5,8 +5,33 @@
 * Building
 Change directory to the same directory as Makefile (same directory as
 this REAMDE) and run make. This will populate the bin/ directory with
-the executable "main". To run, the solver, forward standard input to
-the executable like so: ./bin/main < someinputfile.txt
+the executable "main".
+
+* Running
+To run, the solver, forward standard input to the executable like so:
+./bin/main < someinputfile.txt The input expected is a grid of
+numbers. The first row defines the coefficients of the objective
+function. That is, for example,
+
+1 2
+
+translates to...
+
+f(x,y) = x + 2y
+
+The remaining entries define the coefficients of the linear
+constraints, where the last column contains the constants of the
+linear constraints. For example,
+
+3 2 1
+
+1 2 3
+
+translates to...
+
+3x + 2y < 1
+
+1x + 2y < 3
 
 
 * Solver implementation

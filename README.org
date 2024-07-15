@@ -45,7 +45,7 @@ for this auxilary problem, then basis is used to begin the primal
 simplex algorithm; on the other hand, if the auxilary LP is unbounded,
 then the original LP is found to be infeasible.
 
-The linears systems are solved useing a QR decomposition of the A_B
+The linears systems are solved using a QR decomposition of the A_B
 matrix, instead of directly computing an inverse.
 
 In order to avoid cycling, the pivot selection rule for all pivots is
